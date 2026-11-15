@@ -156,7 +156,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
 .vrow .vl .emo { font-family: var(--font-emoji); font-weight: 400; font-size: 32px; }
 #voice-tabs { margin: 10px 0 4px; }
 .vrow .vs { font-size: 13px; }
-.vrow .vs b { display: block; font-size: 14px; font-weight: 700; }
+.vrow .vs b { display: block; font-size: 17px; font-weight: 700; }
 .vrow .va { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -735,9 +735,9 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     rowEls.forEach(function (r) {
       var has = !!voices[r.key], recNow = recState && recState.key === r.key, row = r.el;
       if (has) done++;
-      var say = vgame === "letters" ? r.item.text : r.item.name;
-      row.querySelector(".vs b").textContent = recNow ? "Recording..." : has ? "Your voice" : "Computer voice";
-      row.querySelector(".vs span").textContent = recNow ? "Say it now" : has ? "Recording saved" : 'Say: "' + say + '"';
+      var label = vgame === "letters" ? r.item.text : r.item.name;
+      row.querySelector(".vs b").textContent = label;
+      row.querySelector(".vs span").textContent = recNow ? "Recording... say it now" : has ? "Your voice saved" : "Computer voice";
       var rb = row.querySelector('[data-act="rec"]');
       rb.textContent = recNow ? "Stop" : has ? "Re-record" : "Record";
       rb.setAttribute("aria-pressed", String(!!recNow));
