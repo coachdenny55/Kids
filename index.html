@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Little Letters</title>
 <meta name="theme-color" content="#f6f3ee">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Little Letters">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
@@ -29,7 +30,7 @@
   --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   color-scheme: light;
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; touch-action: pan-x pan-y; -webkit-touch-callout: none; }
 html, body { height: 100%; margin: 0; background: var(--strip); }
 body { display: flex; flex-direction: column; font-family: var(--font-ui); color: var(--strip-ink); -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
 
@@ -41,10 +42,10 @@ body { display: flex; flex-direction: column; font-family: var(--font-ui); color
   user-select: none; -webkit-user-select: none;
   transition: background-color .45s ease, color .45s ease, opacity .5s ease;
 }
-button.tile { cursor: pointer; touch-action: manipulation; }
+button.tile { cursor: pointer; }
 .tile:focus-visible { outline: 4px solid var(--focus); outline-offset: -8px; }
 .speaker { position: absolute; top: 14px; right: 14px; z-index: 3; width: 60px; height: 60px; border-radius: 50%; border: 0; padding: 0;
-  background: rgba(255,255,255,.6); color: var(--ink); display: flex; align-items: center; justify-content: center; cursor: pointer; touch-action: manipulation; }
+  background: rgba(255,255,255,.6); color: var(--ink); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .speaker svg { width: 30px; height: 30px; }
 .speaker:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 #match .speaker { top: 24px; right: 24px; }
@@ -99,6 +100,21 @@ svg .wk { fill: none; stroke: #fff; opacity: .75; stroke-width: 4; stroke-lineca
 @keyframes burst { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.5); }
   100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); } }
 
+/* Home screen */
+#home { flex: 1 1 auto; min-height: 0; display: none; overflow-y: auto; padding: 22px 14px 14px; }
+#home h1 { font-size: 22px; text-align: center; margin: 0 0 16px; font-weight: 700; }
+#home .grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; max-width: 900px; margin: 0 auto; }
+.htile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; aspect-ratio: 1 / 1.05;
+  border: 0; border-radius: 28px; padding: 14px; background: var(--tb); color: var(--ti); font-family: var(--font-letter); cursor: pointer; }
+.htile:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+.htile .hi { font-size: min(15vw, 9vh); font-weight: 700; line-height: 1; }
+.htile .hi.sm { font-size: min(12vw, 7vh); }
+.htile .hi.emo { font-family: var(--font-emoji); font-weight: 400; }
+.htile svg { width: min(17vw, 10vh); height: min(17vw, 10vh); display: block; }
+.htile b { font-size: 17px; font-weight: 700; }
+body[data-view="home"] #block, body[data-view="home"] #match { display: none; }
+body[data-view="home"] #home { display: flex; flex-direction: column; justify-content: center; }
+body[data-view="home"] .game-only, body[data-view="home"] .learn-only, body[data-view="home"] .match-only { display: none !important; }
 body[data-view="match"] #block { display: none; }
 body[data-view="match"] #match { display: flex; }
 body[data-view="learn"] .match-only { display: none !important; }
@@ -149,7 +165,9 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
 }
 </style>
 </head>
-<body data-view="learn" data-game="letters" data-text="1">
+<body data-view="home" data-game="letters" data-text="1">
+<div id="home"><h1>What shall we play?</h1><div class="grid" id="home-grid"></div></div>
+
 <div id="block" class="tile" role="img" aria-live="polite" aria-label="Letter A">
   <span id="letter">A</span>
   <div id="pic" aria-hidden="true"></div>
@@ -164,18 +182,13 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
 </div>
 
 <div id="strip" role="group" aria-label="Grown-up controls">
-  <div class="group" role="group" aria-label="Mode">
-    <button class="ctl" id="view-learn" type="button" aria-pressed="true">Learn</button>
-    <button class="ctl" id="view-match" type="button" aria-pressed="false">Match</button>
-  </div>
+  <div class="group game-only"><button class="ctl" id="go-home" type="button">Home</button></div>
   <div class="group learn-only">
     <button class="ctl big" id="prev" type="button" aria-label="Previous letter">&larr; Back</button>
     <span id="count">1 of 26</span>
     <button class="ctl big" id="next" type="button" aria-label="Next letter">Next &rarr;</button>
   </div>
-  <div class="group">
-    <button class="ctl" id="open-settings" type="button">Settings</button>
-  </div>
+  <div class="group"><button class="ctl" id="open-settings" type="button">Settings</button></div>
 </div>
 
 <div id="settings" class="panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -186,8 +199,6 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     </header>
     <div class="setrow"><h3>Say it out loud automatically</h3><div class="opts" id="opt-auto"></div>
       <p class="hint">Tap the big letter, or the speaker button in its corner, any time to hear it.</p></div>
-    <div class="setrow match-only"><h3>Game</h3><div class="opts" id="opt-game"></div>
-      <p class="hint">Every game works the same way: find the block that matches the big one.</p></div>
     <div class="setrow match-only words-only"><h3>Word length</h3><div class="opts" id="opt-wordlen"></div></div>
     <div class="setrow match-only"><h3>How many to practice</h3><div class="opts" id="opt-pool"></div>
       <p class="hint">Start small. The game uses the first ones in the list, which are the easiest.</p></div>
@@ -367,7 +378,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
 
   /* ================= State ================= */
   var order = ALPHABET.map(function (_, i) { return i; });
-  var pos = 0, mode = "upper", speak = true, view = "learn", pics = false;
+  var pos = 0, mode = "upper", speak = true, view = "home", pics = false;
   var game = "letters", wordLen = 0, poolIdx = 0, optCount = 2, lastId = null, locked = false, roundTimer = null, target = null, lastColor = -1;
 
   var body = document.body;
@@ -383,7 +394,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   function shuffled(arr) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function updateFlags() {
     body.dataset.view = view; body.dataset.game = game;
-    body.dataset.text = (view === "learn" || GAMES[game].text) ? "1" : "0";
+    body.dataset.text = (view === "learn" || view === "home" || GAMES[game].text) ? "1" : "0";
   }
 
   /* ================= Sound: your recording if there is one, otherwise the computer voice ================= */
@@ -570,7 +581,9 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
       b.className = "tile choice";
       fill(b, item, "choice");
       b.setAttribute("aria-label", item.name || "Choice");
-      b.addEventListener("click", function () { choose(b, item); });
+      // Respond on touch-down so a tap that slides a little still counts. Click covers the keyboard.
+      b.addEventListener("pointerdown", function () { choose(b, item); });
+      b.addEventListener("click", function (e) { if (e.detail === 0) choose(b, item); });
       choicesEl.appendChild(b);
     });
   }
@@ -606,8 +619,6 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     clearTimeout(roundTimer);
     stopSounds();
     updateFlags();
-    document.getElementById("view-learn").setAttribute("aria-pressed", String(v === "learn"));
-    document.getElementById("view-match").setAttribute("aria-pressed", String(v === "match"));
     if (v === "match") { lastId = null; newRound(); } else renderLearn();
     refreshSettings();
   }
@@ -638,8 +649,6 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     });
   }
   function refreshSettings() {
-    group("opt-game", GAME_ORDER.map(function (g) { return { value: g, label: GAMES[g].label }; }),
-      function (v) { return v === game; }, setGame);
     group("opt-wordlen", [{ value: 2, label: "2 letters" }, { value: 3, label: "3 letters" }, { value: 4, label: "4 letters" }, { value: 0, label: "Any" }],
       function (v) { return v === wordLen; }, function (v) { wordLen = v; poolIdx = 0; lastId = null; newRound(); });
     group("opt-pool", GAMES[game].labels.map(function (l, i) { return { value: i, label: l }; }),
@@ -654,6 +663,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
       function (v) { return v === shuffleOn; }, function (v) { shuffleOn = v; setShuffle(v); });
     group("opt-pics", [{ value: false, label: "Off" }, { value: true, label: "On" }],
       function (v) { return v === pics; }, function (v) { pics = v; renderLearn(); });
+    saveSettings();
   }
 
   /* ================= Voices panel: record, play, remove ================= */
@@ -747,19 +757,76 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     dbDo("readwrite", function (st) { st.delete(ch); }).catch(function () {});
   }
 
+  /* ================= Home screen ================= */
+  function svgIcon(item) { return '<svg viewBox="0 0 100 100" aria-hidden="true">' + item.svg + '</svg>'; }
+  var HOME_TILES = [
+    ["learn",    "Learn letters",  '<span class="hi">Aa</span>'],
+    ["letters",  "Match letters",  '<span class="hi">A</span>'],
+    ["shapes",   "Match shapes",   svgIcon(SHAPE_ITEMS[3])],
+    ["words",    "Match words",    '<span class="hi sm">cat</span>'],
+    ["pictures", "Match pictures", '<span class="hi emo">🍎</span>'],
+    ["animals",  "Match animals",  '<span class="hi emo">🐶</span>'],
+    ["abstract", "Match patterns", svgIcon(ABSTRACT_ITEMS[0])]
+  ];
+  function buildHome() {
+    var grid = document.getElementById("home-grid");
+    HOME_TILES.forEach(function (t, i) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "htile";
+      b.style.setProperty("--tb", BLOCKS[(i * 3) % BLOCKS.length][0]);
+      b.style.setProperty("--ti", BLOCKS[(i * 3) % BLOCKS.length][1]);
+      b.innerHTML = t[2] + '<b>' + t[1] + '</b>';
+      b.addEventListener("click", function () { startGame(t[0]); });
+      grid.appendChild(b);
+    });
+  }
+  function startGame(id) {
+    if (id === "learn") { setView("learn"); return; }
+    game = id; lastId = null;
+    if (id === "words" && mode === "upper") mode = "lower";
+    setView("match");
+  }
+  function showHome() {
+    view = "home";
+    clearTimeout(roundTimer);
+    stopSounds();
+    updateFlags();
+    refreshSettings();
+  }
+
+  /* ================= Remember settings on this device ================= */
+  function saveSettings() {
+    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics })); } catch (e) {}
+  }
+  function loadSettings() {
+    try {
+      var o = JSON.parse(localStorage.getItem("little-letters") || "{}");
+      if (typeof o.speak === "boolean") speak = o.speak;
+      if (["upper", "lower", "both"].indexOf(o.mode) >= 0) mode = o.mode;
+      if ([2, 3, 4, 5, 6].indexOf(o.optCount) >= 0) optCount = o.optCount;
+      if ([0, 1, 2].indexOf(o.poolIdx) >= 0) poolIdx = o.poolIdx;
+      if ([0, 2, 3, 4].indexOf(o.wordLen) >= 0) wordLen = o.wordLen;
+      if (typeof o.pics === "boolean") pics = o.pics;
+    } catch (e) {}
+  }
+
+  // No pinch or double-tap zoom, so small fingers can't zoom the screen by accident.
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (t) {
+    document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+  });
+
   /* ================= Wiring ================= */
   function on(id, fn) { document.getElementById(id).addEventListener("click", fn); }
   function closeVoices() { if (recState && recState.rec.state === "recording") recState.rec.stop(); stopSounds(); voicesEl.classList.remove("open"); }
-  on("view-learn", function () { setView("learn"); });
-  on("view-match", function () { setView("match"); });
+  on("go-home", showHome);
   on("next", function () { go(1); });
   on("prev", function () { go(-1); });
   function sayBig() {
     if (view === "learn") say(order[pos], true);
     else if (target && target.name) sayItem(target, true);
   }
-  block.addEventListener("click", function (e) { if (!e.target.closest(".speaker")) sayBig(); });
-  targetEl.addEventListener("click", sayBig);
+  block.addEventListener("pointerdown", function (e) { if (!e.target.closest(".speaker")) sayBig(); });
+  targetEl.addEventListener("pointerdown", sayBig);
   on("speak-learn", sayBig);
   on("speak-match", sayBig);
   on("open-settings", function () { stopSounds(); refreshSettings(); settingsEl.classList.add("open"); document.getElementById("close-settings").focus(); });
@@ -774,9 +841,11 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     else if (e.key === "ArrowLeft") go(-1);
   });
 
+  buildHome();
   buildVoiceRows();
   renderVoiceRows();
   loadVoices();
+  loadSettings();
   updateFlags();
   renderLearn();
   refreshSettings();
