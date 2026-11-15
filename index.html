@@ -150,8 +150,11 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
 .setrow .opts { display: flex; flex-wrap: wrap; gap: 8px; }
 .setrow .hint { font-size: 13px; margin: 8px 0 0; opacity: .8; }
 #voice-msg { color: #8a4b2d; min-height: 1.5em; }
-.vrow { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--strip-line); }
-.vrow .vl { font-family: var(--font-letter); font-weight: 700; font-size: 26px; text-align: center; }
+.vrow { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--strip-line); }
+.vrow .vl { font-family: var(--font-letter); font-weight: 700; font-size: 22px; text-align: center; display: flex; align-items: center; justify-content: center; overflow-wrap: anywhere; }
+.vrow .vl svg { width: 40px; height: 40px; display: block; color: var(--strip-ink); }
+.vrow .vl .emo { font-family: var(--font-emoji); font-weight: 400; font-size: 32px; }
+#voice-tabs { margin: 10px 0 4px; }
 .vrow .vs { font-size: 13px; }
 .vrow .vs b { display: block; font-size: 14px; font-weight: 700; }
 .vrow .va { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
@@ -208,18 +211,20 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     <div class="setrow learn-only"><h3>Order</h3><div class="opts" id="opt-order"></div></div>
     <div class="setrow learn-only"><h3>Picture under each letter</h3><div class="opts" id="opt-pics"></div></div>
     <div class="setrow"><h3>Your voice</h3>
-      <button class="ctl" id="open-voices" type="button">Record your voice for each letter</button>
-      <p class="hint">Tap the big letter or the speaker button to hear it. The other games say the name of the picture or word with the computer voice.</p></div>
+      <button class="ctl" id="open-voices" type="button">Record your voice</button>
+      <p class="hint">Tap the big letter or the speaker button to hear it. Anything you haven't recorded uses the computer voice.</p></div>
   </div>
 </div>
 
 <div id="voices" class="panel" role="dialog" aria-modal="true" aria-labelledby="voices-title">
   <div class="inner">
     <header>
-      <h2 id="voices-title">Your voice for each letter</h2>
+      <h2 id="voices-title">Your voice</h2>
       <button class="ctl" id="close-voices" type="button">Done</button>
     </header>
-    <p>Tap <b>Record</b>, say the letter, then tap <b>Stop</b> (it stops by itself after 5 seconds). Letters without a recording use the computer voice.</p>
+    <p>Pick a game, tap <b>Record</b>, say the letter, word or name out loud, then tap <b>Stop</b>. It stops by itself after 5 seconds. Anything without a recording uses the computer voice.</p>
+    <div class="opts" id="voice-tabs"></div>
+    <p id="voice-count"></p>
     <p id="voice-msg" role="status"></p>
     <div id="voice-list"></div>
   </div>
@@ -446,23 +451,30 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
       window.speechSynthesis.speak(u);
     } catch (e) {}
   }
-  function say(idx, force) {
-    if (!speak && !force) return;
+  function vkey(g, item) { return g === "letters" ? item.id : g + ":" + item.id; }
+  function playKey(key, fallback, after) {
     stopSounds();
-    var word = (pics && view === "learn" && !force) ? LETTER_WORDS[idx] : "";
-    var url = voices[ALPHABET[idx]];
+    var url = voices[key];
     if (url) {
       var a = new Audio(url);
       playing = a;
-      a.onended = function () { if (word) tts(word + "."); };
-      a.play().catch(function () { tts(ALPHABET[idx] + "."); });
+      a.onended = function () { if (after) tts(after); };
+      a.play().catch(function () { tts(fallback); });
     } else {
-      tts(ALPHABET[idx] + "." + (word ? " " + word + "." : ""));
+      tts(fallback + (after ? " " + after : ""));
     }
   }
-  function sayItem(item, force) {
-    if (game === "letters") say(item.i, force);
-    else if (speak || force) { stopSounds(); tts(item.name); }
+  function say(idx, force) {
+    if (!speak && !force) return;
+    var word = (pics && view === "learn" && !force) ? LETTER_WORDS[idx] + "." : "";
+    playKey(ALPHABET[idx], ALPHABET[idx] + ".", word);
+  }
+  function sayItem(item, force, g) {
+    g = g || game;
+    if (g === "letters") { say(item.i, force); return; }
+    if (!speak && !force) return;
+    if (!item.name) return;
+    playKey(vkey(g, item), item.name + ".", "");
   }
 
   /* ================= Learn ================= */
@@ -669,36 +681,63 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   /* ================= Voices panel: record, play, remove ================= */
   var voicesEl = document.getElementById("voices"), settingsEl = document.getElementById("settings");
   var listEl = document.getElementById("voice-list");
+  var vgame = "letters", rowEls = [];
+  var VOICE_GAMES = ["letters", "shapes", "words", "pictures", "animals"];
+
   function setMsg(t) { msg = t || ""; renderMsg(); }
   function renderMsg() {
     document.getElementById("voice-msg").textContent =
       msg || (storeOK ? "" : "Recordings can't be saved in this browser, so they will be lost when you close the page.");
   }
+  function buildVoiceTabs() {
+    var c = document.getElementById("voice-tabs");
+    c.innerHTML = "";
+    VOICE_GAMES.forEach(function (g) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "ctl"; b.textContent = GAMES[g].label;
+      b.setAttribute("aria-pressed", String(g === vgame));
+      b.addEventListener("click", function () {
+        if (recState) return;
+        vgame = g; setMsg(""); buildVoiceTabs(); buildVoiceRows();
+      });
+      c.appendChild(b);
+    });
+  }
+  function rowIcon(item) {
+    if (item.kind === "svg") return '<svg viewBox="0 0 100 100" aria-hidden="true">' + item.svg + '</svg>';
+    if (item.kind === "emoji") return '<span class="emo">' + item.text + '</span>';
+    return '<span>' + (vgame === "letters" ? item.text + item.text.toLowerCase() : item.text) + '</span>';
+  }
   function buildVoiceRows() {
-    ALPHABET.forEach(function (ch, i) {
+    listEl.innerHTML = ""; rowEls = [];
+    GAMES[vgame].items.forEach(function (item) {
+      var key = vkey(vgame, item);
       var row = document.createElement("div");
-      row.className = "vrow"; row.id = "vrow-" + ch;
+      row.className = "vrow";
       row.innerHTML =
-        '<div class="vl">' + ch + ch.toLowerCase() + '</div>' +
+        '<div class="vl">' + rowIcon(item) + '</div>' +
         '<div class="vs"><b></b><span></span></div>' +
         '<div class="va">' +
           '<button class="ctl rec" type="button" data-act="rec" aria-pressed="false">Record</button>' +
           '<button class="ctl" type="button" data-act="play">Play</button>' +
           '<button class="ctl" type="button" data-act="remove">Remove</button>' +
         '</div>';
-      row.querySelector('[data-act="rec"]').addEventListener("click", function () { toggleRecord(i); });
-      row.querySelector('[data-act="play"]').addEventListener("click", function () { say(i, true); });
-      row.querySelector('[data-act="remove"]').addEventListener("click", function () { removeVoice(i); });
+      row.querySelector('[data-act="rec"]').addEventListener("click", function () { toggleRecord(key); });
+      row.querySelector('[data-act="play"]').addEventListener("click", function () { sayItem(item, true, vgame); });
+      row.querySelector('[data-act="remove"]').addEventListener("click", function () { removeVoice(key); });
       listEl.appendChild(row);
+      rowEls.push({ key: key, item: item, el: row });
     });
+    renderVoiceRows();
   }
   function renderVoiceRows() {
-    ALPHABET.forEach(function (ch, i) {
-      var row = document.getElementById("vrow-" + ch);
-      if (!row) return;
-      var has = !!voices[ch], recNow = recState && recState.i === i;
-      row.querySelector("b").textContent = recNow ? "Recording..." : has ? "Your voice" : "Computer voice";
-      row.querySelector("span").textContent = recNow ? "Say the letter now" : has ? "Recording saved" : "No recording yet";
+    var done = 0;
+    rowEls.forEach(function (r) {
+      var has = !!voices[r.key], recNow = recState && recState.key === r.key, row = r.el;
+      if (has) done++;
+      var say = vgame === "letters" ? r.item.text : r.item.name;
+      row.querySelector(".vs b").textContent = recNow ? "Recording..." : has ? "Your voice" : "Computer voice";
+      row.querySelector(".vs span").textContent = recNow ? "Say it now" : has ? "Recording saved" : 'Say: "' + say + '"';
       var rb = row.querySelector('[data-act="rec"]');
       rb.textContent = recNow ? "Stop" : has ? "Re-record" : "Record";
       rb.setAttribute("aria-pressed", String(!!recNow));
@@ -707,6 +746,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
       row.querySelector('[data-act="remove"]').disabled = !!recState;
       row.querySelector('[data-act="remove"]').style.display = has ? "" : "none";
     });
+    document.getElementById("voice-count").textContent = done + " of " + rowEls.length + " recorded";
     renderMsg();
   }
   function pickType() {
@@ -714,8 +754,8 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     for (var i = 0; i < t.length; i++) { if (MediaRecorder.isTypeSupported(t[i])) return t[i]; }
     return "";
   }
-  function toggleRecord(i) {
-    if (recState) { if (recState.i === i && recState.rec.state === "recording") recState.rec.stop(); return; }
+  function toggleRecord(key) {
+    if (recState) { if (recState.key === key && recState.rec.state === "recording") recState.rec.stop(); return; }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
       setMsg("This browser can't record. Open the page in Safari or Chrome over https."); return;
     }
@@ -730,9 +770,9 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
         stream.getTracks().forEach(function (t) { t.stop(); });
         recState = null;
         var blob = new Blob(chunks, { type: rec.mimeType || type || "audio/mp4" });
-        if (blob.size > 0) saveVoice(i, blob); else { renderVoiceRows(); setMsg("Nothing was recorded. Try again."); }
+        if (blob.size > 0) saveVoice(key, blob); else { renderVoiceRows(); setMsg("Nothing was recorded. Try again."); }
       };
-      recState = { i: i, rec: rec };
+      recState = { key: key, rec: rec };
       rec.start();
       timer = setTimeout(function () { if (rec.state === "recording") rec.stop(); }, 5000);
       renderVoiceRows();
@@ -740,21 +780,19 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
       setMsg("The microphone is blocked. Allow microphone access for this page in your browser settings, then try again.");
     });
   }
-  function saveVoice(i, blob) {
-    var ch = ALPHABET[i];
-    if (voices[ch]) URL.revokeObjectURL(voices[ch]);
-    voices[ch] = URL.createObjectURL(blob);
+  function saveVoice(key, blob) {
+    if (voices[key]) URL.revokeObjectURL(voices[key]);
+    voices[key] = URL.createObjectURL(blob);
     renderVoiceRows();
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
-    dbDo("readwrite", function (st) { st.put(blob, ch); }).catch(function () { storeOK = false; renderVoiceRows(); });
-    say(i, true);
+    dbDo("readwrite", function (st) { st.put(blob, key); }).catch(function () { storeOK = false; renderVoiceRows(); });
+    playKey(key, "", "");
   }
-  function removeVoice(i) {
-    var ch = ALPHABET[i];
-    if (voices[ch]) URL.revokeObjectURL(voices[ch]);
-    delete voices[ch];
+  function removeVoice(key) {
+    if (voices[key]) URL.revokeObjectURL(voices[key]);
+    delete voices[key];
     renderVoiceRows();
-    dbDo("readwrite", function (st) { st.delete(ch); }).catch(function () {});
+    dbDo("readwrite", function (st) { st.delete(key); }).catch(function () {});
   }
 
   /* ================= Home screen ================= */
@@ -842,8 +880,8 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   });
 
   buildHome();
+  buildVoiceTabs();
   buildVoiceRows();
-  renderVoiceRows();
   loadVoices();
   loadSettings();
   updateFlags();
