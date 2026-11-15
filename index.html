@@ -379,6 +379,12 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   var NUMBER_ITEMS = NUM_WORDS.map(function (w, i) { return { id: String(i + 1), value: i + 1, kind: "text", text: String(i + 1), g: String(i + 1), k: String(i + 1), name: w }; });
   var COUNT_EMOJI = ["🍎","🍌","🍓","🎈","⭐","⚽","🚗","🌸","🐶","🐱","🐸","🐰","🐥","🐝","🦋","🐢"];
 
+  // [name, hex, optional group]. Colors in one group are never used as wrong answers for each other.
+  var COLOR_DEF = [["red","#E04B4B"],["blue","#3F7FD6","blue"],["yellow","#F2CB3D"],["green","#4FAE5A"],["orange","#F08A33"],["purple","#8A5BC4"],
+    ["pink","#F28FB5"],["brown","#8B5A3C"],["black","#2B2B2E"],["white","#FFFFFF"],["gray","#9A9A9A"],["light blue","#8EC9EE","blue"]];
+  var COLOR_ITEMS = COLOR_DEF.map(function (d) { return { id: d[0], kind: "color", color: d[1], g: d[2] || d[0], k: d[2] || d[0], name: d[0] }; });
+  function swatch(c) { return '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="38" fill="' + c + '" stroke="rgba(0,0,0,.2)" stroke-width="3"/></svg>'; }
+
   var GAMES = {
     letters:  { label: "Letters",  items: LETTER_ITEMS,   sizes: [6, 12, 26],  labels: ["A–F", "A–L", "A–Z"], text: true },
     shapes:   { label: "Shapes",   items: SHAPE_ITEMS,    sizes: [10, 25, 50], labels: ["First 10", "First 25", "All 50"] },
@@ -386,6 +392,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     pictures: { label: "Pictures", items: PICTURE_ITEMS,  sizes: [10, 25, 99], labels: ["First 10", "First 25", "All 50"] },
     animals:  { label: "Animals",  items: ANIMAL_ITEMS,   sizes: [10, 25, 99], labels: ["First 10", "First 25", "All 50"] },
     abstract: { label: "Abstract", items: ABSTRACT_ITEMS, sizes: [10, 25, 50], labels: ["First 10", "First 25", "All 50"] },
+    colors:   { label: "Colors",   items: COLOR_ITEMS,    sizes: [4, 8, 12],   labels: ["First 4", "First 8", "All 12"] },
     numbers:  { label: "Numbers",  items: NUMBER_ITEMS,   sizes: [5, 10, 20],  labels: ["1–5", "1–10", "1–20"] },
     counting: { label: "Counting", items: NUMBER_ITEMS,   sizes: [3, 5, 10, 20], labels: ["1–3", "1–5", "1–10", "1–20"] }
   };
@@ -560,6 +567,11 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   }
   function fill(el, item, role) {
     el.classList.remove("emoji", "svgi");
+    if (item.kind === "color") {
+      if (role === "target") { el.innerHTML = ""; el.style.background = item.color; el.style.boxShadow = item.color === "#FFFFFF" ? "inset 0 0 0 4px #d6d2c9" : ""; }
+      else { el.innerHTML = swatch(item.color); el.classList.add("svgi"); }
+      return;
+    }
     if (item.kind === "text") { el.textContent = caseText(item, role); }
     else if (item.kind === "emoji") { el.textContent = item.text; el.classList.add("emoji"); }
     else { el.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true">' + item.svg + '</svg>'; el.classList.add("svgi"); }
@@ -629,6 +641,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
 
     var ci; do { ci = Math.floor(Math.random() * BLOCKS.length); } while (ci === lastColor);
     lastColor = ci; setColor(ci);
+    targetEl.style.background = ""; targetEl.style.boxShadow = "";
     applySizes(t, k);
     if (game === "counting") { fillCount(t); targetEl.setAttribute("aria-label", "Count them"); }
     else { fill(targetEl, t, "target"); targetEl.setAttribute("aria-label", "Find the match" + (t.name ? ": " + t.name : "")); }
@@ -730,7 +743,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   var voicesEl = document.getElementById("voices"), settingsEl = document.getElementById("settings");
   var listEl = document.getElementById("voice-list");
   var vgame = "letters", rowEls = [];
-  var VOICE_GAMES = ["letters", "numbers", "shapes", "words", "pictures", "animals"];
+  var VOICE_GAMES = ["letters", "numbers", "colors", "shapes", "words", "pictures", "animals"];
 
   function setMsg(t) { msg = t || ""; renderMsg(); }
   function renderMsg() {
@@ -752,6 +765,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     });
   }
   function rowIcon(item) {
+    if (item.kind === "color") return swatch(item.color);
     if (item.kind === "svg") return '<svg viewBox="0 0 100 100" aria-hidden="true">' + item.svg + '</svg>';
     if (item.kind === "emoji") return '<span class="emo">' + item.text + '</span>';
     return '<span>' + (vgame === "letters" ? item.text + item.text.toLowerCase() : item.text) + '</span>';
@@ -851,6 +865,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     ["learn-numbers", "Learn numbers", '<span class="hi">12</span>'],
     ["numbers",  "Match numbers",  '<span class="hi">5</span>'],
     ["counting", "Counting",       '<span class="hi emo">🍎🍎</span>'],
+    ["colors",   "Match colors",   svgIcon({ svg: '<circle cx="32" cy="32" r="22" fill="#E04B4B"/><circle cx="68" cy="32" r="22" fill="#F2CB3D"/><circle cx="32" cy="68" r="22" fill="#4FAE5A"/><circle cx="68" cy="68" r="22" fill="#3F7FD6"/>' })],
     ["shapes",   "Match shapes",   svgIcon(SHAPE_ITEMS[3])],
     ["words",    "Match words",    '<span class="hi sm">cat</span>'],
     ["pictures", "Match pictures", '<span class="hi emo">🍎</span>'],
