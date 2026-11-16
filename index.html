@@ -381,7 +381,10 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
 
   // [name, hex, optional group]. Colors in one group are never used as wrong answers for each other.
   var COLOR_DEF = [["red","#E04B4B"],["blue","#3F7FD6","blue"],["yellow","#F2CB3D"],["green","#4FAE5A"],["orange","#F08A33"],["purple","#8A5BC4"],
-    ["pink","#F28FB5"],["brown","#8B5A3C"],["black","#2B2B2E"],["white","#FFFFFF"],["gray","#9A9A9A"],["light blue","#8EC9EE","blue"]];
+    ["pink","#F28FB5"],["brown","#8B5A3C"],["black","#2B2B2E"],["white","#FFFFFF"],["gray","#9A9A9A"],["light blue","#8EC9EE","blue"],
+    ["lime","#A6D12F","green"],["teal","#2A9D8F","green"],["dark green","#2F6B3A","green"],["navy","#27408B","blue"],["turquoise","#40C4C0","blue"],
+    ["maroon","#8B2A3A","red"],["magenta","#C73E9E","pink"],["lavender","#C3B1E1","purple"],["peach","#F9C3A0","orange"],["gold","#D4A017","yellow"],
+    ["tan","#D2B48C","brown"],["silver","#C8CCD0","gray"]];
   var COLOR_ITEMS = COLOR_DEF.map(function (d) { return { id: d[0], kind: "color", color: d[1], g: d[2] || d[0], k: d[2] || d[0], name: d[0] }; });
   function swatch(c) { return '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="38" fill="' + c + '" stroke="rgba(0,0,0,.2)" stroke-width="3"/></svg>'; }
 
@@ -392,7 +395,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     pictures: { label: "Pictures", items: PICTURE_ITEMS,  sizes: [10, 25, 99], labels: ["First 10", "First 25", "All 50"] },
     animals:  { label: "Animals",  items: ANIMAL_ITEMS,   sizes: [10, 25, 99], labels: ["First 10", "First 25", "All 50"] },
     abstract: { label: "Abstract", items: ABSTRACT_ITEMS, sizes: [10, 25, 50], labels: ["First 10", "First 25", "All 50"] },
-    colors:   { label: "Colors",   items: COLOR_ITEMS,    sizes: [4, 8, 12],   labels: ["First 4", "First 8", "All 12"] },
+    colors:   { label: "Colors",   items: COLOR_ITEMS,    sizes: [4, 8, 12, 24],   labels: ["First 4", "First 8", "First 12", "All 24"] },
     numbers:  { label: "Numbers",  items: NUMBER_ITEMS,   sizes: [5, 10, 20],  labels: ["1–5", "1–10", "1–20"] },
     counting: { label: "Counting", items: NUMBER_ITEMS,   sizes: [3, 5, 10, 20], labels: ["1–3", "1–5", "1–10", "1–20"] }
   };
