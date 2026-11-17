@@ -170,6 +170,14 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   .badge path { animation: none; stroke-dashoffset: 0; }
   .dot { display: none; }
 }
+/* Trace view: a big ghost glyph with a finger-drawing canvas on top */
+#trace { position: relative; flex: 1 1 auto; min-height: 0; display: none; margin: 10px; border-radius: 28px; touch-action: none; }
+#trace canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 28px; touch-action: none; }
+#trace .speaker { top: 24px; right: 24px; }
+body[data-view="trace"] #trace { display: block; }
+body[data-view="trace"] #block, body[data-view="trace"] #match { display: none; }
+body[data-view="trace"] .learn-only, body[data-view="trace"] .match-only { display: none !important; }
+body:not([data-view="trace"]) .trace-only { display: none !important; }
 </style>
 </head>
 <body data-view="home" data-game="letters" data-text="1">
@@ -188,12 +196,26 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   <button class="speaker" id="speak-match" type="button" aria-label="Say it"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
 </div>
 
+<div id="trace" class="tile" role="img" aria-label="Trace">
+  <canvas id="tc-ghost"></canvas><canvas id="tc-ink"></canvas>
+  <button class="speaker" id="speak-trace" type="button" aria-label="Say it"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+</div>
+
 <div id="strip" role="group" aria-label="Grown-up controls">
   <div class="group game-only"><button class="ctl" id="go-home" type="button">Home</button></div>
   <div class="group learn-only">
     <button class="ctl big" id="prev" type="button" aria-label="Previous letter">&larr; Back</button>
     <span id="count">1 of 26</span>
     <button class="ctl big" id="next" type="button" aria-label="Next letter">Next &rarr;</button>
+  </div>
+  <div class="group trace-only">
+    <button class="ctl big" id="t-prev" type="button" aria-label="Previous">&larr; Back</button>
+    <span id="tcount">1 of 26</span>
+    <button class="ctl big" id="t-next" type="button" aria-label="Next">Next &rarr;</button>
+  </div>
+  <div class="group trace-only">
+    <button class="ctl big" id="t-clear" type="button">Clear</button>
+    <button class="ctl big" id="t-ok" type="button">Nice job &#10003;</button>
   </div>
   <div class="group"><button class="ctl" id="open-settings" type="button">Settings</button></div>
 </div>
@@ -402,6 +424,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   var order = ALPHABET.map(function (_, i) { return i; });
   var pos = 0, mode = "upper", speak = true, view = "home", pics = false;
   var learnSet = "letters", countLayout = null, lastEmoji = -1, game = "letters", wordLen = 0, poolIdx = 0, optCount = 2, lastId = null, locked = false, roundTimer = null, target = null, lastColor = -1;
+  var tset = "letters", tpos = 0;
 
   var body = document.body;
   var block = document.getElementById("block");
@@ -416,7 +439,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   function shuffled(arr) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function updateFlags() {
     body.dataset.view = view; body.dataset.game = game; body.dataset.learnset = learnSet;
-    body.dataset.text = view === "home" ? "1" : view === "learn" ? (learnSet === "letters" ? "1" : "0") : (GAMES[game].text ? "1" : "0");
+    body.dataset.text = view === "home" ? "1" : view === "trace" ? (tset === "letters" ? "1" : "0") : view === "learn" ? (learnSet === "letters" ? "1" : "0") : (GAMES[game].text ? "1" : "0");
   }
 
   /* ================= Sound: your recording if there is one, otherwise the computer voice ================= */
@@ -693,7 +716,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     clearTimeout(roundTimer);
     stopSounds();
     updateFlags();
-    if (v === "match") { lastId = null; newRound(); } else renderLearn();
+    if (v === "match") { lastId = null; newRound(); } else if (v === "trace") renderTrace(); else renderLearn();
     refreshSettings();
   }
   function setGame(g) {
@@ -857,6 +880,143 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     dbDo("readwrite", function (st) { st.delete(key); }).catch(function () {});
   }
 
+  /* ================= Trace: finger-trace a greyed-out letter, number or shape ================= */
+  // Pre-writing strokes in a 0-100 box, easiest first.
+  var TRACE_SHAPES = [
+    ["line down", "M50 14 L50 86"], ["line across", "M14 50 L86 50"],
+    ["circle", "M50 14 A36 36 0 1 1 50 86 A36 36 0 1 1 50 14 Z"],
+    ["plus", "M50 14 L50 86 M14 50 L86 50"], ["slanty line", "M22 82 L78 18"], ["cross", "M20 20 L80 80 M80 20 L20 80"],
+    ["square", "M20 20 H80 V80 H20 Z"], ["triangle", "M50 16 L84 80 H16 Z"],
+    ["zigzag", "M10 72 L30 28 L50 72 L70 28 L90 72"], ["wave", "M8 50 Q21 10 34 50 T60 50 T86 50"]
+  ];
+  var traceEl = document.getElementById("trace"), tG = document.getElementById("tc-ghost"), tI = document.getElementById("tc-ink");
+  var tgx = tG.getContext("2d"), tix = tI.getContext("2d");
+  var strokes = [], drawing = null, tW = 0, tH = 0, tDpr = 1, tSparked = false, tLocked = false, tLast = 0;
+  var T_FONT = "Andika, 'Trebuchet MS', 'Arial Rounded MT Bold', sans-serif";
+  function traceLen() { return tset === "letters" ? ALPHABET.length : tset === "numbers" ? NUMBER_ITEMS.length : TRACE_SHAPES.length; }
+  function traceGlyph() {
+    if (tset === "shapes") return { path: TRACE_SHAPES[tpos][1], name: TRACE_SHAPES[tpos][0] };
+    if (tset === "numbers") return { text: NUMBER_ITEMS[tpos].text, name: NUMBER_ITEMS[tpos].name };
+    var ch = ALPHABET[tpos];
+    return { text: mode === "lower" ? ch.toLowerCase() : ch, name: ch };
+  }
+  function traceSay(force) {
+    if (!speak && !force) return;
+    if (tset === "letters") say(tpos, true);
+    else if (tset === "numbers") sayItem(NUMBER_ITEMS[tpos], true, "numbers");
+    else playKey("trace:" + TRACE_SHAPES[tpos][0], TRACE_SHAPES[tpos][0] + ".", "");
+  }
+  // Draw the glyph (or its mask) into a context of size w x h.
+  function paintGlyph(ctx, w, h, fill, g) {
+    var S = Math.min(w, h);
+    if (g.path) {
+      var side = S * 0.74, sc = side / 100;
+      ctx.save(); ctx.translate((w - side) / 2, (h - side) / 2); ctx.scale(sc, sc);
+      ctx.lineWidth = 10; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = fill;
+      ctx.stroke(new Path2D(g.path)); ctx.restore();
+      return;
+    }
+    var f = S * 0.95;
+    ctx.font = "700 " + f + "px " + T_FONT;
+    var m = ctx.measureText(g.text);
+    if (m.width > w * 0.82) { f *= (w * 0.82) / m.width; ctx.font = "700 " + f + "px " + T_FONT; m = ctx.measureText(g.text); }
+    var asc = m.actualBoundingBoxAscent || f * 0.72, desc = m.actualBoundingBoxDescent || 0;
+    ctx.fillStyle = fill; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText(g.text, w / 2, h / 2 + (asc - desc) / 2);
+  }
+  function drawStrokes(ctx, w, h, lw) {
+    ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = lw;
+    strokes.forEach(function (st) {
+      ctx.beginPath();
+      st.forEach(function (p, i) { var x = p[0] * w, y = p[1] * h; if (i === 0) { ctx.moveTo(x, y); ctx.lineTo(x + 0.01, y); } else ctx.lineTo(x, y); });
+      ctx.stroke();
+    });
+  }
+  function penW() { return Math.min(tW, tH) * 0.1; }
+  function tidyTrace() { Array.prototype.forEach.call(traceEl.querySelectorAll(".badge,.dot"), function (d) { d.remove(); }); }
+  function layoutTrace() {
+    var r = traceEl.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    tW = r.width; tH = r.height; tDpr = Math.min(window.devicePixelRatio || 1, 2);
+    [tG, tI].forEach(function (c) { c.width = Math.round(tW * tDpr); c.height = Math.round(tH * tDpr); });
+    var ink = BLOCKS[tpos % BLOCKS.length][1];
+    tgx.setTransform(tDpr, 0, 0, tDpr, 0, 0); tgx.clearRect(0, 0, tW, tH);
+    tgx.globalAlpha = 0.26; paintGlyph(tgx, tW, tH, ink, traceGlyph()); tgx.globalAlpha = 1;
+    tix.setTransform(tDpr, 0, 0, tDpr, 0, 0); tix.clearRect(0, 0, tW, tH);
+    tix.strokeStyle = ink; tix.globalAlpha = 0.85; drawStrokes(tix, tW, tH, penW()); tix.globalAlpha = 1;
+  }
+  function renderTrace() {
+    clearTimeout(roundTimer); tLocked = false; tSparked = false; strokes = []; drawing = null; tidyTrace();
+    setColor(tpos);
+    var g = traceGlyph();
+    traceEl.setAttribute("aria-label", "Trace " + g.name);
+    document.getElementById("tcount").textContent = (tpos + 1) + " of " + traceLen();
+    layoutTrace();
+    traceSay(false);
+  }
+  function traceGo(step) { tpos = (tpos + step + traceLen()) % traceLen(); renderTrace(); }
+  function traceClear() { clearTimeout(roundTimer); tLocked = false; tSparked = false; strokes = []; tidyTrace(); layoutTrace(); }
+  function sparkle() {
+    var html = "";
+    for (var i = 0; i < 8; i++) {
+      var a = (i / 8) * Math.PI * 2, r = 90 + (i % 2) * 40;
+      html += '<span class="dot" aria-hidden="true" style="background:' + BLOCKS[(i + 2) % BLOCKS.length][0] + ';--dx:' + Math.round(Math.cos(a) * r) + 'px;--dy:' + Math.round(Math.sin(a) * r) + 'px"></span>';
+    }
+    traceEl.insertAdjacentHTML("beforeend", html);
+    setTimeout(function () { Array.prototype.forEach.call(traceEl.querySelectorAll(".dot"), function (d) { d.remove(); }); }, 1400);
+  }
+  // How much of the glyph is covered by the drawing, 0 to 1 (low-resolution comparison).
+  function coverage() {
+    if (!tW || !strokes.length) return 0;
+    var R = 0.25, w = Math.max(1, Math.round(tW * R)), h = Math.max(1, Math.round(tH * R));
+    var a = document.createElement("canvas"), b = document.createElement("canvas");
+    a.width = b.width = w; b.height = a.height = h;
+    var ax = a.getContext("2d"), bx = b.getContext("2d");
+    paintGlyph(ax, w, h, "#000", traceGlyph());
+    bx.strokeStyle = "#000"; drawStrokes(bx, w, h, penW() * R);
+    var A = ax.getImageData(0, 0, w, h).data, B = bx.getImageData(0, 0, w, h).data, tot = 0, hit = 0;
+    for (var i = 3; i < A.length; i += 4) if (A[i] > 128) { tot++; if (B[i] > 128) hit++; }
+    return tot ? hit / tot : 0;
+  }
+  function checkCover() {
+    if (tSparked || tLocked) return;
+    if (coverage() >= 0.6) { tSparked = true; sparkle(); }
+  }
+  function tPt(e) { var r = traceEl.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; }
+  function tDrawLast() {
+    var st = strokes[strokes.length - 1], n = st.length;
+    tix.strokeStyle = BLOCKS[tpos % BLOCKS.length][1]; tix.globalAlpha = 0.85; tix.lineCap = "round"; tix.lineJoin = "round"; tix.lineWidth = penW();
+    tix.beginPath();
+    if (n === 1) { tix.moveTo(st[0][0] * tW, st[0][1] * tH); tix.lineTo(st[0][0] * tW + 0.01, st[0][1] * tH); }
+    else { tix.moveTo(st[n - 2][0] * tW, st[n - 2][1] * tH); tix.lineTo(st[n - 1][0] * tW, st[n - 1][1] * tH); }
+    tix.stroke(); tix.globalAlpha = 1;
+  }
+  tI.addEventListener("pointerdown", function (e) {
+    if (drawing !== null || tLocked) return;
+    if (e.pointerType === "touch" && e.width > 70) return;   // ignore a big flat palm
+    drawing = e.pointerId;
+    try { tI.setPointerCapture(e.pointerId); } catch (x) {}
+    strokes.push([tPt(e)]); tDrawLast(); e.preventDefault();
+  });
+  tI.addEventListener("pointermove", function (e) {
+    if (e.pointerId !== drawing) return;
+    strokes[strokes.length - 1].push(tPt(e)); tDrawLast(); e.preventDefault();
+    var now = Date.now(); if (now - tLast > 400) { tLast = now; checkCover(); }
+  });
+  function tEnd(e) { if (e.pointerId !== drawing) return; drawing = null; checkCover(); }
+  tI.addEventListener("pointerup", tEnd);
+  tI.addEventListener("pointercancel", tEnd);
+  window.addEventListener("resize", function () { if (view === "trace") layoutTrace(); });
+  window.addEventListener("orientationchange", function () { setTimeout(function () { if (view === "trace") layoutTrace(); }, 250); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (view === "trace") layoutTrace(); });
+  function traceOk() {
+    if (tLocked) return;
+    tLocked = true; drawing = null;
+    celebrate(traceEl);
+    traceSay(true);
+    roundTimer = setTimeout(function () { traceGo(1); }, 2200);
+  }
+
   /* ================= Home screen ================= */
   function svgIcon(item) { return '<svg viewBox="0 0 100 100" aria-hidden="true">' + item.svg + '</svg>'; }
   var HOME_TILES = [
@@ -867,6 +1027,9 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
     ["counting", "Counting",       '<span class="hi emo">🍎🍎</span>'],
     ["colors",   "Match colors",   svgIcon({ svg: '<circle cx="32" cy="32" r="22" fill="#E04B4B"/><circle cx="68" cy="32" r="22" fill="#F2CB3D"/><circle cx="32" cy="68" r="22" fill="#4FAE5A"/><circle cx="68" cy="68" r="22" fill="#3F7FD6"/>' })],
     ["shapes",   "Match shapes",   svgIcon(SHAPE_ITEMS[3])],
+    ["trace-letters", "Trace letters", svgIcon({ svg: '<text x="50" y="78" font-size="78" text-anchor="middle" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="5 6" font-family="Andika, Arial, sans-serif" font-weight="700">A</text>' })],
+    ["trace-numbers", "Trace numbers", svgIcon({ svg: '<text x="50" y="78" font-size="78" text-anchor="middle" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="5 6" font-family="Andika, Arial, sans-serif" font-weight="700">2</text>' })],
+    ["trace-shapes", "Trace shapes", svgIcon({ svg: '<circle cx="50" cy="50" r="32" fill="none" stroke="currentColor" stroke-width="7" stroke-dasharray="2 13" stroke-linecap="round"/>' })],
     ["words",    "Match words",    '<span class="hi sm">cat</span>'],
     ["pictures", "Match pictures", '<span class="hi emo">🍎</span>'],
     ["animals",  "Match animals",  '<span class="hi emo">🐶</span>'],
@@ -886,6 +1049,7 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   }
   function startGame(id) {
     if (id === "learn" || id === "learn-numbers") { setLearnSet(id === "learn" ? "letters" : "numbers"); setView("learn"); return; }
+    if (id.indexOf("trace-") === 0) { tset = id.slice(6); tpos = 0; setView("trace"); return; }
     game = id; lastId = null;
     if (id === "words" && mode === "upper") mode = "lower";
     setView("match");
@@ -934,6 +1098,11 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   targetEl.addEventListener("pointerdown", sayBig);
   on("speak-learn", sayBig);
   on("speak-match", sayBig);
+  on("speak-trace", function () { traceSay(true); });
+  on("t-prev", function () { traceGo(-1); });
+  on("t-next", function () { traceGo(1); });
+  on("t-clear", traceClear);
+  on("t-ok", traceOk);
   on("open-settings", function () { stopSounds(); refreshSettings(); settingsEl.classList.add("open"); document.getElementById("close-settings").focus(); });
   on("close-settings", function () { settingsEl.classList.remove("open"); });
   on("open-voices", function () { settingsEl.classList.remove("open"); voicesEl.classList.add("open"); document.getElementById("close-voices").focus(); });
