@@ -30,7 +30,7 @@
   --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   color-scheme: light;
 }
-* { box-sizing: border-box; touch-action: pan-x pan-y; -webkit-touch-callout: none; }
+* { box-sizing: border-box; touch-action: pan-y; -webkit-touch-callout: none; }
 html, body { height: 100%; margin: 0; background: var(--strip); }
 body { display: flex; flex-direction: column; font-family: var(--font-ui); color: var(--strip-ink); -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
 
@@ -193,6 +193,11 @@ body[data-view="trace"] #trace { display: block; }
 body[data-view="trace"] #block, body[data-view="trace"] #match { display: none; }
 body[data-view="trace"] .learn-only, body[data-view="trace"] .match-only { display: none !important; }
 body:not([data-view="trace"]) .trace-only { display: none !important; }
+/* No zoom anywhere. Only the home screen (and the settings/voices panels) may scroll, and only up and down. */
+body:not([data-view="home"]) { overflow: hidden; touch-action: none; }
+body:not([data-view="home"]) * { touch-action: none; }
+body[data-view] .panel, body[data-view] .panel * { touch-action: pan-y; }
+body[data-view="home"] #home, body[data-view="home"] #home * { touch-action: pan-y; }
 </style>
 </head>
 <body data-view="home" data-game="letters" data-text="1">
