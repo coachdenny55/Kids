@@ -92,12 +92,13 @@ svg .wk { fill: none; stroke: #fff; opacity: .75; stroke-width: 4; stroke-lineca
 #target.win { animation: nudge .8s ease both; }
 .badge { position: absolute; top: -16px; right: -16px; width: clamp(52px, 34%, 88px); aspect-ratio: 1; border-radius: 50%;
   background: #4f9a5f; display: flex; align-items: center; justify-content: center;
-  transform: scale(0); animation: badge .55s .2s cubic-bezier(.3,1.6,.5,1) forwards; }
+  transform: scale(0); animation: badge .45s .03s cubic-bezier(.3,1.6,.5,1) forwards; }
 .badge svg { width: 58%; height: 58%; }
 .badge path { fill: none; stroke: #fff; stroke-width: 13; stroke-linecap: round; stroke-linejoin: round;
-  stroke-dasharray: 70; stroke-dashoffset: 70; animation: draw .4s .5s ease-out forwards; }
+  stroke-dasharray: 70; stroke-dashoffset: 70; animation: draw .35s .2s ease-out forwards; }
 .dot { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; border-radius: 50%; opacity: 0;
-  animation: burst 1s .15s ease-out forwards; pointer-events: none; }
+  animation: burst 1s .05s ease-out forwards; pointer-events: none; }
+.badge.wait, .badge.wait path, .dot.wait { animation-play-state: paused; }
 @keyframes pop { 0% { transform: scale(1); } 35% { transform: scale(1.12); } 62% { transform: scale(.98); } 100% { transform: scale(1.06); } }
 @keyframes nudge { 0% { transform: scale(1); } 40% { transform: scale(1.015); } 100% { transform: scale(1); } }
 @keyframes badge { to { transform: scale(1); } }
@@ -986,6 +987,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   document.addEventListener("visibilitychange", rearm);
   window.addEventListener("pageshow", rearm);
   function chime(soft) {
+    releaseCheck();
     if (muted) return;
     var a = soft ? dingSoft : dingBig;
     if (!a) return;
@@ -1004,6 +1006,19 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
         ';--dx:' + Math.round(Math.cos(a) * r) + 'px;--dy:' + Math.round(Math.sin(a) * r) + 'px"></span>';
     }
     btn.insertAdjacentHTML("beforeend", html);
+    // When the chime is coming after the voice, hold the check and dots until the chime plays so they land together.
+    if (quiet) {
+      var held = btn.querySelectorAll(".badge,.dot");
+      Array.prototype.forEach.call(held, function (e) { e.classList.add("wait"); });
+      pendingCheck = held;
+      setTimeout(releaseCheck, 4500);
+    }
+  }
+  var pendingCheck = null;
+  function releaseCheck() {
+    if (!pendingCheck) return;
+    Array.prototype.forEach.call(pendingCheck, function (e) { e.classList.remove("wait"); });
+    pendingCheck = null;
   }
   // The voice says the right answer first, then the check-mark chime plays.
   function chimeAfterVoice(soft) { return function () { setTimeout(function () { chime(soft); }, 120); }; }
