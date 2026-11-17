@@ -241,10 +241,12 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
 .pgrid { display: grid; gap: calc(var(--cs) * .12); }
 .pcell { width: var(--cs); height: var(--cs); border-radius: 26%; background: rgba(255,255,255,.62); font-size: calc(var(--cs) * .6); }
 .pcell.e { background: rgba(0,0,0,.09); }
+.pcell.hot { box-shadow: 0 0 0 5px rgba(58,55,51,.5); }
+.pdrag { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -50%) scale(1.08); background: #fff; box-shadow: 0 10px 24px rgba(0,0,0,.25); }
 .pcell.pop { animation: pop .5s ease both; }
 .pcell.shake { animation: shake .4s ease; }
 @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
-.pal { flex: 1 1 0; min-width: 0; max-width: 200px; border-radius: 22px; background: #dcd9d3; color: #3a3733; font-size: min(14vw, 9vh); cursor: pointer; }
+.pal { cursor: grab; flex: 1 1 0; min-width: 0; max-width: 200px; border-radius: 22px; background: #dcd9d3; color: #3a3733; font-size: min(14vw, 9vh); cursor: pointer; }
 .pal[aria-pressed="true"] { box-shadow: 0 0 0 6px rgba(58,55,51,.6); }
 .pkhide { position: absolute; inset: 0; z-index: 2; border: 0; border-radius: 28px; background: var(--bg); color: var(--ink); font: 700 min(30vw, 18vh)/1 var(--font-letter); cursor: pointer; display: none; align-items: center; justify-content: center; }
 .pkhide.on { display: flex; }
@@ -346,7 +348,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     <div class="setrow vo-pattern"><h3>What to copy</h3><div class="opts" id="opt-pitems"></div></div>
     <div class="setrow vo-pattern"><h3>How many to choose from</h3><div class="opts" id="opt-pcount"></div></div>
     <div class="setrow vo-pattern"><h3>Hide the pattern after</h3><div class="opts" id="opt-phide"></div>
-      <p class="hint">A memory game: the top pattern disappears after this many seconds. Tap the top box to peek again.</p></div>
+      <p class="hint">Drag a choice up into a square (or tap a choice, then tap a square). A memory game: the top pattern disappears after this many seconds. Tap the top box to peek again.</p></div>
     <div class="setrow learn-only"><h3>Order</h3><div class="opts" id="opt-order"></div></div>
     <div class="setrow learn-only letters-only"><h3>Picture under each letter</h3><div class="opts" id="opt-pics"></div></div>
     <div class="setrow"><h3>Your voice</h3>
@@ -1569,9 +1571,10 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       b.type = "button"; b.className = "tile pal"; fill(b, it, "choice");
       b.setAttribute("aria-label", it.name || "Choice");
       b.setAttribute("aria-pressed", String(it.id === patSel));
-      b.addEventListener("pointerdown", function () {
+      b.addEventListener("pointerdown", function (e) {
         patSel = it.id;
         Array.prototype.forEach.call(patPalEl.children, function (c) { c.setAttribute("aria-pressed", String(c === b)); });
+        patDragStart(e, b, it);
       });
       patPalEl.appendChild(b);
     });
@@ -1591,6 +1594,53 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     } else {
       el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake");
     }
+  }
+  // Drag a choice up to a square. A plain tap still selects it, then tap a square.
+  var patDrag = null;
+  function patCellAt(x, y) {
+    var best = null, bd = 1e9, cs = parseFloat(paGrid.style.getPropertyValue("--cs")) || 60;
+    patCells.forEach(function (c, i) {
+      var r = c.getBoundingClientRect(), dx = x - (r.left + r.width / 2), dy = y - (r.top + r.height / 2), d = Math.sqrt(dx * dx + dy * dy);
+      if (d < bd && !c.classList.contains("full")) { bd = d; best = i; }
+    });
+    return best !== null && bd <= cs * 0.8 ? best : null;
+  }
+  function patDragStart(e, b, it) {
+    if (patLocked || patDrag) return;
+    patDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false, ghost: null, it: it, hot: null };
+    try { b.setPointerCapture(e.pointerId); } catch (x) {}
+    function move(ev) {
+      if (!patDrag || ev.pointerId !== patDrag.id) return;
+      var d = patDrag;
+      if (!d.moved && Math.abs(ev.clientX - d.x) + Math.abs(ev.clientY - d.y) > 10) {
+        d.moved = true;
+        d.ghost = document.createElement("div");
+        d.ghost.className = "tile pcell pdrag";
+        d.ghost.style.setProperty("--cs", (paGrid.style.getPropertyValue("--cs") || "80px"));
+        fill(d.ghost, d.it, "choice");
+        document.body.appendChild(d.ghost);
+      }
+      if (d.moved) {
+        d.ghost.style.left = ev.clientX + "px"; d.ghost.style.top = (ev.clientY - 30) + "px";
+        var i = patCellAt(ev.clientX, ev.clientY - 30);
+        if (d.hot !== null && d.hot !== i) patCells[d.hot].classList.remove("hot");
+        if (i !== null) patCells[i].classList.add("hot");
+        d.hot = i;
+      }
+      ev.preventDefault();
+    }
+    function end(ev) {
+      if (!patDrag || ev.pointerId !== patDrag.id) return;
+      var d = patDrag; patDrag = null;
+      b.removeEventListener("pointermove", move); b.removeEventListener("pointerup", end); b.removeEventListener("pointercancel", end);
+      if (d.ghost) d.ghost.remove();
+      if (d.hot !== null) patCells[d.hot].classList.remove("hot");
+      if (d.moved && ev.type === "pointerup") {
+        var i = patCellAt(ev.clientX, ev.clientY - 30);
+        if (i !== null) patTap(i, patCells[i]);
+      }
+    }
+    b.addEventListener("pointermove", move); b.addEventListener("pointerup", end); b.addEventListener("pointercancel", end);
   }
   pkHide.addEventListener("pointerdown", function () { showKey(); });
   window.addEventListener("resize", function () { if (view === "pattern") layoutPat(); });
