@@ -208,6 +208,12 @@ body:not([data-view="dots"]) .vo-dots, body:not([data-view="rhyme"]) .vo-rhyme {
 body:not([data-view="trace"]):not([data-view="path"]):not([data-view="dots"]):not([data-view="rhyme"]) .nav-only { display: none !important; }
 body:not([data-view="trace"]):not([data-view="path"]):not([data-view="dots"]) .clear-only { display: none !important; }
 body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
+/* Nursery rhymes */
+#rhyme { margin: 10px; border-radius: 28px; flex-direction: column; gap: 1.2vh; padding: 14px 18px; cursor: pointer; text-align: center; }
+#rhyme .re { font-family: var(--font-emoji); font-weight: 400; font-size: min(24vw, 15vh); line-height: 1; }
+#rhyme .rt { font-size: min(7vw, 4.2vh); font-weight: 700; }
+#rhyme .rl { font-size: min(5.2vw, 3vh); font-weight: 400; line-height: 1.45; }
+#rhyme .speaker { top: 24px; right: 24px; }
 /* Follow the path and Dot-to-dot */
 #path, #dots { margin: 10px; border-radius: 28px; touch-action: none; overflow: hidden; }
 #path canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; touch-action: none; }
@@ -292,6 +298,13 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   <button class="speaker" id="speak-dots" type="button" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"></svg></button>
 </div>
 
+<div id="rhyme" class="vw tile">
+  <span class="re" id="rh-emoji" aria-hidden="true"></span>
+  <span class="rt" id="rh-title"></span>
+  <span class="rl" id="rh-lines"></span>
+  <button class="speaker" id="speak-rhyme" type="button" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"></svg></button>
+</div>
+
 <div id="strip" role="group" aria-label="Grown-up controls">
   <div class="group game-only"><button class="ctl" id="go-home" type="button">Home</button></div>
   <div class="group learn-only">
@@ -348,7 +361,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       <h2 id="voices-title">Your voice</h2>
       <button class="ctl" id="close-voices" type="button">Done</button>
     </header>
-    <p>Pick a game, tap <b>Record</b>, say the letter, word or name out loud, then tap <b>Stop</b>. It stops by itself after 5 seconds. Anything without a recording uses the computer voice.</p>
+    <p>Pick a game, tap <b>Record</b>, say the letter, word or name out loud, then tap <b>Stop</b>. It stops by itself after 5 seconds (90 seconds for nursery rhymes, so you can say the whole rhyme). Anything without a recording uses the computer voice.</p>
     <div class="opts" id="voice-tabs"></div>
     <p id="voice-count"></p>
     <p id="voice-msg" role="status"></p>
@@ -651,7 +664,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     if (g === "letters") { say(item.i, force); return; }
     if (!speak && !force) return;
     if (!item.name) return;
-    playKey(vkey(g, item), item.name + ".", "");
+    playKey(vkey(g, item), g === "nursery" ? item.say : item.name + ".", "");
   }
 
   /* ================= Learn ================= */
@@ -951,7 +964,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     clearTimeout(roundTimer); clearTimeout(patTimer);
     stopSounds();
     updateFlags();
-    if (v === "match") { lastId = null; newRound(); } else if (v === "trace") renderTrace(); else if (v === "memory") renderMem(); else if (v === "pattern") renderPat(); else if (v === "path") pathRender(); else if (v === "dots") dotsRender(); else renderLearn();
+    if (v === "match") { lastId = null; newRound(); } else if (v === "trace") renderTrace(); else if (v === "memory") renderMem(); else if (v === "pattern") renderPat(); else if (v === "path") pathRender(); else if (v === "dots") dotsRender(); else if (v === "rhyme") rhymeRender(); else renderLearn();
     refreshSettings();
   }
   function setGame(g) {
@@ -1010,7 +1023,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   var voicesEl = document.getElementById("voices"), settingsEl = document.getElementById("settings");
   var listEl = document.getElementById("voice-list");
   var vgame = "letters", rowEls = [];
-  var VOICE_GAMES = ["letters", "numbers", "colors", "shapes", "words", "pictures", "animals"];
+  var VOICE_GAMES = ["letters", "numbers", "colors", "shapes", "words", "pictures", "animals", "nursery"];
 
   function setMsg(t) { msg = t || ""; renderMsg(); }
   function renderMsg() {
@@ -1103,7 +1116,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       };
       recState = { key: key, rec: rec };
       rec.start();
-      timer = setTimeout(function () { if (rec.state === "recording") rec.stop(); }, 5000);
+      timer = setTimeout(function () { if (rec.state === "recording") rec.stop(); }, key.indexOf("nursery:") === 0 ? 90000 : 5000);
       renderVoiceRows();
     }).catch(function () {
       setMsg("The microphone is blocked. Allow microphone access for this page in your browser settings, then try again.");
@@ -1260,6 +1273,37 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     traceSay(true);
     roundTimer = setTimeout(function () { traceGo(1); }, 2200);
   }
+
+  /* ================= Nursery rhymes (old, public-domain verses) ================= */
+  var RHYMES = [
+    ["twinkle", "⭐", "Twinkle, Twinkle, Little Star", ["Twinkle, twinkle, little star,", "How I wonder what you are!", "Up above the world so high,", "Like a diamond in the sky.", "Twinkle, twinkle, little star,", "How I wonder what you are!"]],
+    ["humpty", "🥚", "Humpty Dumpty", ["Humpty Dumpty sat on a wall,", "Humpty Dumpty had a great fall.", "All the king's horses and all the king's men", "Couldn't put Humpty together again."]],
+    ["jack", "⛰️", "Jack and Jill", ["Jack and Jill went up the hill", "To fetch a pail of water.", "Jack fell down and broke his crown,", "And Jill came tumbling after."]],
+    ["diddle", "🐄", "Hey Diddle Diddle", ["Hey diddle diddle,", "The cat and the fiddle,", "The cow jumped over the moon;", "The little dog laughed", "To see such sport,", "And the dish ran away with the spoon."]],
+    ["baa", "🐑", "Baa, Baa, Black Sheep", ["Baa, baa, black sheep,", "Have you any wool?", "Yes sir, yes sir,", "Three bags full.", "One for the master,", "And one for the dame,", "And one for the little boy", "Who lives down the lane."]],
+    ["muffet", "🕷️", "Little Miss Muffet", ["Little Miss Muffet", "Sat on a tuffet,", "Eating her curds and whey;", "Along came a spider,", "Who sat down beside her", "And frightened Miss Muffet away."]],
+    ["hickory", "🐭", "Hickory Dickory Dock", ["Hickory, dickory, dock,", "The mouse ran up the clock.", "The clock struck one,", "The mouse ran down,", "Hickory, dickory, dock."]],
+    ["row", "🚣", "Row, Row, Row Your Boat", ["Row, row, row your boat,", "Gently down the stream.", "Merrily, merrily, merrily, merrily,", "Life is but a dream."]],
+    ["mary", "🐑", "Mary Had a Little Lamb", ["Mary had a little lamb,", "Its fleece was white as snow;", "And everywhere that Mary went", "The lamb was sure to go."]],
+    ["itsy", "🌧️", "The Itsy Bitsy Spider", ["The itsy bitsy spider", "Climbed up the water spout.", "Down came the rain", "And washed the spider out.", "Out came the sun", "And dried up all the rain,", "And the itsy bitsy spider", "Climbed up the spout again."]],
+    ["patacake", "🎂", "Pat-a-Cake", ["Pat-a-cake, pat-a-cake, baker's man;", "Bake me a cake as fast as you can;", "Pat it and prick it and mark it with B,", "And put it in the oven for baby and me."]]
+  ];
+  var RHYME_V = RHYMES.map(function (r) { return { id: r[0], kind: "emoji", text: r[1], name: r[2], say: r[2] + ". " + r[3].join(" "), lines: r[3] }; });
+  GAMES.nursery = { label: "Nursery rhymes", items: RHYME_V, sizes: [99], labels: ["All"] };
+  var rpos = 0, rhymeEl = document.getElementById("rhyme");
+  function rhymeRender() {
+    var r = RHYME_V[rpos];
+    setColor(rpos);
+    document.getElementById("rh-emoji").textContent = r.text;
+    document.getElementById("rh-title").textContent = r.name;
+    document.getElementById("rh-lines").innerHTML = r.lines.map(function (l) { return l.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }).join("<br>");
+    document.getElementById("tcount").textContent = (rpos + 1) + " of " + RHYME_V.length;
+    stopSounds();
+  }
+  function rhymeGo(d) { rpos = (rpos + d + RHYME_V.length) % RHYME_V.length; rhymeRender(); }
+  function rhymePlay() { var r = RHYME_V[rpos]; playKey(vkey("nursery", r), r.say, ""); }
+  rhymeEl.addEventListener("pointerdown", function (e) { if (!e.target.closest(".speaker")) rhymePlay(); });
+  document.getElementById("t-hear").addEventListener("click", rhymePlay);
 
   /* ================= Follow the path ================= */
   function spiralD() {
@@ -1420,7 +1464,8 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   var NAV = {
     trace: { go: function (d) { traceGo(d); }, clear: function () { traceClear(); } },
     path: { go: pathGo, clear: pathClear },
-    dots: { go: dotsGo, clear: function () { dotsRender(); } }
+    dots: { go: dotsGo, clear: function () { dotsRender(); } },
+    rhyme: { go: rhymeGo, clear: function () {} }
   };
 
   /* ================= Memory cards ================= */
@@ -1574,6 +1619,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     ["pattern",  "Copy the pattern", svgIcon({ svg: '<circle cx="28" cy="28" r="16" fill="#E04B4B"/><circle cx="72" cy="28" r="16" fill="#3F7FD6"/><circle cx="28" cy="72" r="16" fill="#F2CB3D"/><circle cx="72" cy="72" r="16" fill="#4FAE5A"/>' })],
     ["path",     "Follow the path", svgIcon({ svg: '<path d="M14 80 C14 30 50 70 50 40 C50 14 86 30 86 18" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" opacity=".35"/><circle cx="14" cy="80" r="9" fill="currentColor"/><circle cx="86" cy="18" r="9" fill="currentColor"/>' })],
     ["dots",     "Dot to dot",     svgIcon({ svg: '<path d="M50 14 L86 80 L14 80 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="5 6"/><circle cx="50" cy="14" r="10" fill="currentColor"/><circle cx="86" cy="80" r="10" fill="currentColor"/><circle cx="14" cy="80" r="10" fill="currentColor"/>' })],
+    ["nursery",  "Nursery rhymes", '<span class="hi emo">🐑</span>'],
     ["words",    "Match words",    '<span class="hi sm">cat</span>'],
     ["pictures", "Match pictures", '<span class="hi emo">🍎</span>'],
     ["animals",  "Match animals",  '<span class="hi emo">🐶</span>'],
@@ -1585,11 +1631,11 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       ["Letters", ["learn", "letters", "trace-letters", "firstsounds"]],
       ["Numbers", ["learn-numbers", "numbers", "trace-numbers", "counting", "dots"]],
       ["Colors and shapes", ["colors", "shapes", "trace-shapes"]],
-      ["Pictures and words", ["words", "pictures", "animals", "abstract", "opposites", "rhymes", "sort"]],
+      ["Pictures and words", ["nursery", "words", "pictures", "animals", "abstract", "opposites", "rhymes", "sort"]],
       ["Thinking games", ["path", "bigsmall", "odd", "next", "memory", "pattern"]]
     ],
     type: [
-      ["Learn", ["learn", "learn-numbers"]],
+      ["Learn", ["learn", "learn-numbers", "nursery"]],
       ["Match", ["letters", "numbers", "colors", "shapes", "words", "pictures", "animals", "abstract", "opposites", "rhymes", "firstsounds", "sort"]],
       ["Trace", ["trace-letters", "trace-numbers", "trace-shapes", "path", "dots"]],
       ["Think and count", ["counting", "bigsmall", "odd", "next", "memory", "pattern"]]
@@ -1630,6 +1676,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     if (id === "learn" || id === "learn-numbers") { setLearnSet(id === "learn" ? "letters" : "numbers"); setView("learn"); return; }
     if (id.indexOf("trace-") === 0) { tset = id.slice(6); tpos = 0; setView("trace"); return; }
     if (id === "memory" || id === "pattern" || id === "path" || id === "dots") { setView(id); return; }
+    if (id === "nursery") { setView("rhyme"); return; }
     game = id; lastId = null;
     if (id === "words" && mode === "upper") mode = "lower";
     setView("match");
@@ -1701,7 +1748,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       else if (view === "match" && game !== "counting" && target && target.name) sayItem(target, true);
     }
   }
-  ["speak-learn", "speak-match", "speak-trace", "speak-mem", "speak-pat", "speak-path", "speak-dots"].forEach(function (id) { on(id, function () { setMuted(!muted); }); });
+  ["speak-learn", "speak-match", "speak-trace", "speak-mem", "speak-pat", "speak-path", "speak-dots", "speak-rhyme"].forEach(function (id) { on(id, function () { setMuted(!muted); }); });
   on("t-prev", function () { NAV[view].go(-1); });
   on("t-next", function () { NAV[view].go(1); });
   on("t-clear", function () { NAV[view].clear(); });
