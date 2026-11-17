@@ -930,30 +930,56 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       choicesEl.appendChild(b);
     });
   }
-  /* A short, calm "ba-ding" made with the Web Audio API. It follows the speaker button: no sound when muted. */
-  var actx = null;
-  function audioCtx() {
-    if (!actx) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) { try { actx = new AC(); } catch (x) {} } }
-    if (actx && actx.state === "suspended") { try { actx.resume(); } catch (x) {} }
-    return actx;
+  /* A short, calm "ba-ding". It is built as a tiny WAV file and played like normal media, which iPads play
+     reliably (Web Audio is often silent there). It is unlocked on the first touch, and it follows the speaker button. */
+  function makeWav(notes, dur) {
+    var sr = 22050, n = Math.floor(sr * dur), pcm = new Int16Array(n), i, k;
+    notes.forEach(function (nt) {
+      var start = Math.floor(nt.t * sr), len = Math.floor(nt.d * sr);
+      for (i = 0; i < len && start + i < n; i++) {
+        var t = i / sr, env = t < 0.012 ? t / 0.012 : Math.exp(-5.5 * (t - 0.012) / nt.d);
+        var v = (Math.sin(2 * Math.PI * nt.f * t) + 0.22 * Math.sin(4 * Math.PI * nt.f * t)) * nt.v * env;
+        pcm[start + i] = Math.max(-32767, Math.min(32767, pcm[start + i] + Math.round(v * 32767)));
+      }
+    });
+    var buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf);
+    function str(o, t) { for (k = 0; k < t.length; k++) dv.setUint8(o + k, t.charCodeAt(k)); }
+    str(0, "RIFF"); dv.setUint32(4, 36 + n * 2, true); str(8, "WAVE"); str(12, "fmt "); dv.setUint32(16, 16, true);
+    dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true);
+    dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); str(36, "data"); dv.setUint32(40, n * 2, true);
+    for (i = 0; i < n; i++) dv.setInt16(44 + i * 2, pcm[i], true);
+    return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
   }
-  document.addEventListener("pointerdown", function () { audioCtx(); }, { capture: true, passive: true });
-  function bell(c, freq, t0, dur, vol) {
-    [[freq, vol], [freq * 2, vol * 0.22]].forEach(function (p) {
-      var o = c.createOscillator(), g = c.createGain();
-      o.type = "sine"; o.frequency.value = p[0];
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.linearRampToValueAtTime(p[1], t0 + 0.012);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+  var dingBig = null, dingSoft = null, dingReady = false;
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = "playback";
+    dingBig = new Audio(makeWav([{ f: 659, t: 0, d: 0.22, v: 0.5 }, { f: 988, t: 0.11, d: 1.0, v: 0.6 }], 1.3));
+    dingSoft = new Audio(makeWav([{ f: 988, t: 0, d: 0.6, v: 0.5 }], 0.75));
+    dingBig.preload = dingSoft.preload = "auto";
+  } catch (x) {}
+  // Browsers only allow sound after a touch, so quietly "play" both once on the first touch.
+  function unlockDing() {
+    if (dingReady) return;
+    [dingBig, dingSoft].forEach(function (a) {
+      if (!a) return;
+      try {
+        a.muted = true;
+        var pr = a.play();
+        var back = function () { try { a.pause(); a.currentTime = 0; } catch (x) {} a.muted = false; };
+        if (pr && pr.then) pr.then(function () { back(); dingReady = true; }).catch(function () { a.muted = false; }); else { back(); dingReady = true; }
+      } catch (x) { a.muted = false; }
     });
   }
+  ["touchend", "pointerup", "click"].forEach(function (ev) { document.addEventListener(ev, unlockDing, { capture: true, passive: true }); });
   function chime(soft) {
     if (muted) return;
-    var c = audioCtx(); if (!c) return;
-    var t = c.currentTime + 0.02;
-    if (soft) bell(c, 988, t, 0.5, 0.1);
-    else { bell(c, 659, t, 0.2, 0.12); bell(c, 988, t + 0.11, 0.95, 0.15); }
+    var a = soft ? dingSoft : dingBig;
+    if (!a) return;
+    try {
+      a.currentTime = 0; a.muted = false; a.volume = 1;
+      var pr = a.play();
+      if (pr && pr.catch) pr.catch(function () {});
+    } catch (x) {}
   }
   function celebrate(btn, quiet) {
     if (!quiet) chime();
