@@ -902,10 +902,9 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
     return { text: mode === "lower" ? ch.toLowerCase() : ch, name: ch };
   }
   function traceSay(force) {
-    if (!speak && !force) return;
+    if (tset === "shapes" || (!speak && !force)) return;
     if (tset === "letters") say(tpos, true);
     else if (tset === "numbers") sayItem(NUMBER_ITEMS[tpos], true, "numbers");
-    else playKey("trace:" + TRACE_SHAPES[tpos][0], TRACE_SHAPES[tpos][0] + ".", "");
   }
   // Draw the glyph (or its mask) into a context of size w x h.
   function paintGlyph(ctx, w, h, fill, g) {
@@ -952,6 +951,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
     var g = traceGlyph();
     traceEl.setAttribute("aria-label", "Trace " + g.name);
     document.getElementById("tcount").textContent = (tpos + 1) + " of " + traceLen();
+    document.getElementById("speak-trace").hidden = tset === "shapes";
     layoutTrace();
     traceSay(false);
   }
