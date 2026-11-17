@@ -628,45 +628,50 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       });
     }).catch(function () { storeOK = false; }).then(function () { renderVoiceRows(); });
   }
+  var voiceTok = 0;
   function stopSounds() {
+    voiceTok++;
     if (playing) { try { playing.pause(); } catch (e) {} playing = null; }
     try { window.speechSynthesis.cancel(); } catch (e) {}
   }
-  function tts(text) {
-    if (!text || !("speechSynthesis" in window)) return;
+  function tts(text, done) {
+    if (!text || !("speechSynthesis" in window)) { if (done) done(); return; }
     try {
       var u = new SpeechSynthesisUtterance(text);
       u.lang = "en-US"; u.rate = 0.8; u.pitch = 1.05; u.volume = 0.8;
+      if (done) { u.onend = done; u.onerror = done; }
       window.speechSynthesis.speak(u);
-    } catch (e) {}
+    } catch (e) { if (done) done(); }
   }
   function vkey(g, item) { return g === "letters" ? item.id : g + ":" + item.id; }
   var muted = false, bypassMute = false;
-  function playKey(key, fallback, after) {
+  // done (optional) runs once the voice has finished, or at once if nothing will be said.
+  function playKey(key, fallback, after, done) {
     stopSounds();
-    if (muted && !bypassMute) return;
+    var tok = voiceTok, fin = function () { if (!done || tok !== voiceTok) return; var d = done; done = null; d(); };
+    if (muted && !bypassMute) { fin(); return; }
+    setTimeout(fin, 3500);   // safety net if the browser never reports the end of speech
     var url = voices[key];
     if (url) {
       var a = new Audio(url);
       playing = a;
-      a.onended = function () { if (after) tts(after); };
-      a.play().catch(function () { tts(fallback); });
+      a.onended = function () { if (after) tts(after, fin); else fin(); };
+      a.play().catch(function () { tts(fallback, fin); });
     } else {
-      tts(fallback + (after ? " " + after : ""));
+      tts(fallback + (after ? " " + after : ""), fin);
     }
   }
-  function say(idx, force) {
-    if (!speak && !force) return;
+  function say(idx, force, done) {
+    if (!speak && !force) { if (done) done(); return; }
     var word = (pics && view === "learn" && !force) ? LETTER_WORDS[idx] + "." : "";
-    playKey(ALPHABET[idx], ALPHABET[idx] + ".", word);
+    playKey(ALPHABET[idx], ALPHABET[idx] + ".", word, done);
   }
-  function sayItem(item, force, g) {
+  function sayItem(item, force, g, done) {
     g = g || game;
     if (g === "counting") g = "numbers";
-    if (g === "letters") { say(item.i, force); return; }
-    if (!speak && !force) return;
-    if (!item.name) return;
-    playKey(vkey(g, item), g === "nursery" ? item.say : item.name + ".", "");
+    if (g === "letters") { say(item.i, force, done); return; }
+    if ((!speak && !force) || !item.name) { if (done) done(); return; }
+    playKey(vkey(g, item), g === "nursery" ? item.say : item.name + ".", "", done);
   }
 
   /* ================= Learn ================= */
@@ -950,8 +955,8 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     if (soft) bell(c, 988, t, 0.5, 0.1);
     else { bell(c, 659, t, 0.2, 0.12); bell(c, 988, t + 0.11, 0.95, 0.15); }
   }
-  function celebrate(btn) {
-    chime();
+  function celebrate(btn, quiet) {
+    if (!quiet) chime();
     var html = '<span class="badge" aria-hidden="true"><svg viewBox="0 0 60 60"><path d="M12 31 L25 44 L48 17"/></svg></span>';
     for (var i = 0; i < 10; i++) {
       var a = (i / 10) * Math.PI * 2, r = i % 2 ? 150 : 100;
@@ -960,14 +965,17 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     }
     btn.insertAdjacentHTML("beforeend", html);
   }
+  // The voice says the right answer first, then the check-mark chime plays.
+  function chimeAfterVoice(soft) { return function () { setTimeout(function () { chime(soft); }, 120); }; }
   function onCorrect(item) {
+    var done = chimeAfterVoice(false);
     if (GAMES[game].answers) {
-      if (!speak) return;
-      playKey("pair:" + game + ":" + target.id, target.name + ". " + item.name + ".", "");
+      if (!speak) { chime(); return; }
+      playKey("pair:" + game + ":" + target.id, target.name + ". " + item.name + ".", "", done);
     } else if (GAMES[game].custom) {
-      if (!speak || !target.name) return;
-      playKey("pair:" + game, target.name + ".", "");
-    } else sayItem(item);
+      if (!speak || !target.name) { chime(); return; }
+      playKey("pair:" + game, target.name + ".", "", done);
+    } else sayItem(item, false, game, done);
   }
   function choose(btn, item) {
     if (locked) return;
@@ -976,7 +984,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       Array.prototype.forEach.call(choicesEl.children, function (c) { if (c !== btn) c.classList.add("gone"); });
       btn.classList.add("picked");
       targetEl.classList.add("win");
-      celebrate(btn);
+      celebrate(btn, true);
       onCorrect(item);
       roundTimer = setTimeout(newRound, 2200);
     } else {
@@ -1185,10 +1193,10 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     var ch = ALPHABET[tpos];
     return { text: mode === "lower" ? ch.toLowerCase() : ch, name: ch };
   }
-  function traceSay(force) {
-    if (tset === "shapes" || (!speak && !force)) return;
-    if (tset === "letters") say(tpos, true);
-    else if (tset === "numbers") sayItem(NUMBER_ITEMS[tpos], true, "numbers");
+  function traceSay(force, done) {
+    if (tset === "shapes" || (!speak && !force)) { if (done) done(); return; }
+    if (tset === "letters") say(tpos, true, done);
+    else if (tset === "numbers") sayItem(NUMBER_ITEMS[tpos], true, "numbers", done);
   }
   // Draw the glyph (or its mask) into a context of size w x h.
   function paintGlyph(ctx, w, h, fill, g) {
@@ -1297,8 +1305,8 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   function traceOk() {
     if (tLocked) return;
     tLocked = true; drawing = null;
-    celebrate(traceEl);
-    traceSay(true);
+    celebrate(traceEl, true);
+    traceSay(true, chimeAfterVoice(false));
     roundTimer = setTimeout(function () { traceGo(1); }, 2200);
   }
 
@@ -1480,8 +1488,9 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       dDone = true;
       if (pic[2]) dotLine(pts[pts.length - 1], pts[0]);
       document.getElementById("dp-fill").setAttribute("fill-opacity", "0.16");
-      celebrate(dotsEl);
-      if (speak) setTimeout(function () { playKey("dots:" + pic[0], pic[0] + ".", ""); }, 700);
+      celebrate(dotsEl, true);
+      if (speak) setTimeout(function () { playKey("dots:" + pic[0], pic[0] + ".", "", chimeAfterVoice(false)); }, 600);
+      else chime();
       roundTimer = setTimeout(function () { dotsGo(1); }, 3200);
     }
     dotsPulse();
@@ -1533,9 +1542,9 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     var a = memOpen[0], d = memOpen[1];
     if (a.item.id === d.item.id) {
       a.done = d.done = true; a.el.classList.add("match"); d.el.classList.add("match"); memOpen = [];
-      if (!memCards.every(function (x) { return x.done; })) chime(true);
-      if (speak && a.item.name) playKey("mem:" + a.item.id, a.item.name + ".", "");
-      if (memCards.every(function (x) { return x.done; })) { celebrate(memEl); roundTimer = setTimeout(renderMem, 2800); }
+      var all = memCards.every(function (x) { return x.done; });
+      if (speak && a.item.name) playKey("mem:" + a.item.id, a.item.name + ".", "", chimeAfterVoice(!all)); else chime(!all);
+      if (all) { celebrate(memEl, true); roundTimer = setTimeout(renderMem, 2800); }
     } else {
       memLock = true;
       roundTimer = setTimeout(function () { a.up = d.up = false; a.el.classList.remove("up"); d.el.classList.remove("up"); memOpen = []; memLock = false; }, 1100);
