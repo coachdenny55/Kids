@@ -114,6 +114,7 @@ svg .wk { fill: none; stroke: #fff; opacity: .75; stroke-width: 4; stroke-lineca
 .htile .hi { font-size: min(15vw, 9vh); font-weight: 700; line-height: 1; }
 .htile .hi.sm { font-size: min(12vw, 7vh); }
 .htile .hi.emo { font-family: var(--font-emoji); font-weight: 400; }
+.htile .hi.two { font-size: min(7vw, 4.4vh); white-space: nowrap; }
 .htile svg { width: min(17vw, 10vh); height: min(17vw, 10vh); display: block; }
 .htile b { font-size: 17px; font-weight: 700; }
 body[data-view="home"] #block, body[data-view="home"] #match { display: none; }
@@ -1024,7 +1025,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
     ["letters",  "Match letters",  '<span class="hi">A</span>'],
     ["learn-numbers", "Learn numbers", '<span class="hi">12</span>'],
     ["numbers",  "Match numbers",  '<span class="hi">5</span>'],
-    ["counting", "Counting",       '<span class="hi emo">🍎🍎</span>'],
+    ["counting", "Counting",       '<span class="hi emo two">🍎🍎</span>'],
     ["colors",   "Match colors",   svgIcon({ svg: '<circle cx="32" cy="32" r="22" fill="#E04B4B"/><circle cx="68" cy="32" r="22" fill="#F2CB3D"/><circle cx="32" cy="68" r="22" fill="#4FAE5A"/><circle cx="68" cy="68" r="22" fill="#3F7FD6"/>' })],
     ["shapes",   "Match shapes",   svgIcon(SHAPE_ITEMS[3])],
     ["trace-letters", "Trace letters", svgIcon({ svg: '<text x="50" y="78" font-size="78" text-anchor="middle" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="5 6" font-family="Andika, Arial, sans-serif" font-weight="700">A</text>' })],
