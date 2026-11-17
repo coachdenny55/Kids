@@ -108,7 +108,10 @@ svg .wk { fill: none; stroke: #fff; opacity: .75; stroke-width: 4; stroke-lineca
 /* Home screen */
 #home { flex: 1 1 auto; min-height: 0; display: none; overflow-y: auto; padding: 22px 14px 14px; }
 #home h1 { font-size: 22px; text-align: center; margin: 0 0 16px; font-weight: 700; }
-#home .grid { margin-block: auto; width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; max-width: 900px; margin-inline: auto; }
+#home .grid { margin-block: auto; width: 100%; max-width: 900px; margin-inline: auto; display: flex; flex-direction: column; gap: 14px; }
+#home .sec h2 { margin: 0 0 6px 6px; font-size: 14px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .6; }
+#home .row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 600px) { #home .grid { max-width: none; } #home .row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .htile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; aspect-ratio: 1 / 1.05;
   border: 0; border-radius: 28px; padding: 14px; background: var(--tb); color: var(--ti); font-family: var(--font-letter); cursor: pointer; }
 .htile:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
@@ -172,6 +175,15 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
   .badge path { animation: none; stroke-dashoffset: 0; }
   .dot { display: none; }
 }
+.htile { --ar: 1; aspect-ratio: var(--ar); min-height: 0; overflow: hidden; padding: 6px; gap: 6px; container-type: size; width: 100%; }
+@media (orientation: landscape) and (min-width: 700px) { .htile { --ar: 1.7; } }
+.htile .hi { font-size: 44cqmin; }
+.htile .hi.sm { font-size: 32cqmin; }
+.htile .hi.two { font-size: 24cqmin; }
+.htile svg { width: 46cqmin; height: 46cqmin; }
+.htile b { font-size: clamp(13px, 10.5cqmin, 19px); text-align: center; line-height: 1.15; }
+#home .grid { gap: 10px; }
+#home h1 { margin-bottom: 12px; }
 /* Trace view: a big ghost glyph with a finger-drawing canvas on top */
 #trace { position: relative; flex: 1 1 auto; min-height: 0; display: none; margin: 10px; border-radius: 28px; touch-action: none; }
 #trace canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 28px; touch-action: none; }
@@ -1039,16 +1051,31 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
     ["animals",  "Match animals",  '<span class="hi emo">🐶</span>'],
     ["abstract", "Match patterns", svgIcon(ABSTRACT_ITEMS[0])]
   ];
+  // Games grouped by what they teach, one row per group.
+  var HOME_SECTIONS = [
+    ["Letters", ["learn", "letters", "trace-letters"]],
+    ["Numbers", ["learn-numbers", "numbers", "trace-numbers", "counting"]],
+    ["Colors and shapes", ["colors", "shapes", "trace-shapes"]],
+    ["Pictures and words", ["words", "pictures", "animals", "abstract"]]
+  ];
   function buildHome() {
-    var grid = document.getElementById("home-grid");
-    HOME_TILES.forEach(function (t, i) {
-      var b = document.createElement("button");
-      b.type = "button"; b.className = "htile";
-      b.style.setProperty("--tb", BLOCKS[(i * 3) % BLOCKS.length][0]);
-      b.style.setProperty("--ti", BLOCKS[(i * 3) % BLOCKS.length][1]);
-      b.innerHTML = t[2] + '<b>' + t[1] + '</b>';
-      b.addEventListener("click", function () { startGame(t[0]); });
-      grid.appendChild(b);
+    var grid = document.getElementById("home-grid"), n = 0, byId = {};
+    HOME_TILES.forEach(function (t) { byId[t[0]] = t; });
+    HOME_SECTIONS.forEach(function (sec) {
+      var wrap = document.createElement("section"); wrap.className = "sec";
+      wrap.innerHTML = "<h2>" + sec[0] + "</h2>";
+      var row = document.createElement("div"); row.className = "row";
+      sec[1].forEach(function (id) {
+        var t = byId[id], i = n++;
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "htile";
+        b.style.setProperty("--tb", BLOCKS[(i * 3) % BLOCKS.length][0]);
+        b.style.setProperty("--ti", BLOCKS[(i * 3) % BLOCKS.length][1]);
+        b.innerHTML = t[2] + '<b>' + t[1] + '</b>';
+        b.addEventListener("click", function () { startGame(t[0]); });
+        row.appendChild(b);
+      });
+      wrap.appendChild(row); grid.appendChild(wrap);
     });
   }
   function startGame(id) {
