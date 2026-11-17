@@ -970,7 +970,21 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       } catch (x) { a.muted = false; }
     });
   }
-  ["touchend", "pointerup", "click"].forEach(function (ev) { document.addEventListener(ev, unlockDing, { capture: true, passive: true }); });
+  // iPads can leave speech and sound "asleep" after the app opens or returns from the background. A quiet wake-up on
+  // the first touch (and again after coming back) does the same thing the mute/unmute button used to.
+  function wakeAudio() {
+    unlockDing();
+    try {
+      var ss = window.speechSynthesis;
+      if (ss) { ss.cancel(); ss.resume(); var u = new SpeechSynthesisUtterance(" "); u.volume = 0; ss.speak(u); }
+    } catch (x) {}
+  }
+  var woke = false;
+  function firstWake() { if (woke) return; woke = true; wakeAudio(); }
+  ["touchend", "pointerup", "click"].forEach(function (ev) { document.addEventListener(ev, firstWake, { capture: true, passive: true }); });
+  function rearm() { if (document.visibilityState === "hidden") return; dingReady = false; woke = false; }
+  document.addEventListener("visibilitychange", rearm);
+  window.addEventListener("pageshow", rearm);
   function chime(soft) {
     if (muted) return;
     var a = soft ? dingSoft : dingBig;
