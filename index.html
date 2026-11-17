@@ -132,8 +132,8 @@ body:not([data-game="words"]) .words-only { display: none !important; }
 body[data-text="0"] .text-only { display: none !important; }
 
 #strip {
-  flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
-  gap: 8px 12px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); font-size: 14px;
+  order: -1; flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 8px 12px; padding: calc(10px + env(safe-area-inset-top)) 16px 6px; font-size: 14px;
 }
 .group { display: flex; align-items: center; gap: 6px; }
 button.ctl {
