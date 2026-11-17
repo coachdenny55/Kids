@@ -208,6 +208,16 @@ body:not([data-view="dots"]) .vo-dots, body:not([data-view="rhyme"]) .vo-rhyme {
 body:not([data-view="trace"]):not([data-view="path"]):not([data-view="dots"]):not([data-view="rhyme"]) .nav-only { display: none !important; }
 body:not([data-view="trace"]):not([data-view="path"]):not([data-view="dots"]) .clear-only { display: none !important; }
 body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
+/* Follow the path and Dot-to-dot */
+#path, #dots { margin: 10px; border-radius: 28px; touch-action: none; overflow: hidden; }
+#path canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; touch-action: none; }
+.pmark { position: absolute; pointer-events: none; line-height: 1; font-family: var(--font-emoji); font-weight: 400; transform: translate(-50%, -50%); }
+#dots-svg { width: 100%; height: 100%; display: block; touch-action: none; }
+#dots-svg .dd { cursor: pointer; }
+#dots-svg text { font-family: var(--font-letter); font-weight: 700; pointer-events: none; }
+.dpulse { animation: dpulse 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes dpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.16); } }
+#path .speaker, #dots .speaker { top: 24px; right: 24px; }
 /* Memory cards */
 #mem { padding: 10px; }
 #mem-grid { flex: 1 1 auto; min-height: 0; width: 100%; display: grid; gap: 12px; grid-auto-rows: 1fr; }
@@ -270,6 +280,16 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   <div id="pat-ans" class="pbox"><div class="pgrid" id="pa-grid"></div></div>
   <div id="pat-pal" role="group" aria-label="Choices"></div>
   <button class="speaker" id="speak-pat" type="button" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"></svg></button>
+</div>
+
+<div id="path" class="vw tile">
+  <canvas id="pc-g"></canvas><canvas id="pc-i"></canvas>
+  <button class="speaker" id="speak-path" type="button" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"></svg></button>
+</div>
+
+<div id="dots" class="vw tile">
+  <svg id="dots-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Dot to dot"></svg>
+  <button class="speaker" id="speak-dots" type="button" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"></svg></button>
 </div>
 
 <div id="strip" role="group" aria-label="Grown-up controls">
@@ -931,7 +951,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     clearTimeout(roundTimer); clearTimeout(patTimer);
     stopSounds();
     updateFlags();
-    if (v === "match") { lastId = null; newRound(); } else if (v === "trace") renderTrace(); else if (v === "memory") renderMem(); else if (v === "pattern") renderPat(); else renderLearn();
+    if (v === "match") { lastId = null; newRound(); } else if (v === "trace") renderTrace(); else if (v === "memory") renderMem(); else if (v === "pattern") renderPat(); else if (v === "path") pathRender(); else if (v === "dots") dotsRender(); else renderLearn();
     refreshSettings();
   }
   function setGame(g) {
@@ -1241,6 +1261,168 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     roundTimer = setTimeout(function () { traceGo(1); }, 2200);
   }
 
+  /* ================= Follow the path ================= */
+  function spiralD() {
+    var d = "";
+    for (var i = 0; i <= 70; i++) {
+      var t = i / 70, th = -Math.PI / 2 + t * 4 * Math.PI, r = 42 - 36 * t;
+      d += (i ? "L" : "M") + (50 + r * Math.cos(th)).toFixed(1) + " " + (50 + r * Math.sin(th)).toFixed(1);
+    }
+    return d;
+  }
+  var PATHS = [
+    "M12 50 L88 50", "M50 12 L50 88", "M14 86 L86 14", "M12 72 Q50 0 88 72", "M8 50 Q21 14 34 50 T60 50 T88 50",
+    "M10 78 L30 24 L50 76 L70 24 L90 76", "M20 14 C90 14 90 50 50 50 C10 50 10 86 80 86", "M10 88 H34 V64 H58 V40 H82 V14",
+    "M12 14 H88 V38 H12 V62 H88 V86", spiralD()
+  ];
+  var PATH_MARKS = [["🐶", "🦴"], ["🐰", "🥕"], ["🐝", "🌸"], ["🐭", "🧀"], ["🐻", "🍯"], ["🐵", "🍌"], ["🐢", "🥬"]];
+  var ppos = 0, pSamples = [], pS = [], pPi = 0, pDrawing = null, pDone = false, pw = 30, pSpace = 1, pMarks = null;
+  var pathEl = document.getElementById("path"), pG = document.getElementById("pc-g"), pI = document.getElementById("pc-i");
+  var pgx = pG.getContext("2d"), pix = pI.getContext("2d");
+  function samplePath(d) {
+    var ns = "http://www.w3.org/2000/svg", sv = document.createElementNS(ns, "svg"), pa = document.createElementNS(ns, "path");
+    sv.setAttribute("style", "position:absolute;width:0;height:0;visibility:hidden");
+    pa.setAttribute("d", d); sv.appendChild(pa); document.body.appendChild(sv);
+    var len = pa.getTotalLength(), out = [];
+    for (var l = 0; l <= len; l += 0.5) { var q = pa.getPointAtLength(l); out.push([q.x, q.y]); }
+    var e = pa.getPointAtLength(len); out.push([e.x, e.y]);
+    document.body.removeChild(sv);
+    return out;
+  }
+  function pathStroke(ctx, from, to, w, alpha, color) {
+    if (to < from) return;
+    ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(pS[from][0], pS[from][1]);
+    for (var i = from + 1; i <= to; i++) ctx.lineTo(pS[i][0], pS[i][1]);
+    if (to === from) ctx.lineTo(pS[from][0] + 0.01, pS[from][1]);
+    ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  function layoutPath() {
+    var r = pathEl.getBoundingClientRect(), W = r.width, H = r.height;
+    if (!W || !H) return;
+    var S = Math.min(W, H) * 0.8, ox = (W - S) / 2, oy = (H - S) / 2, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    pS = pSamples.map(function (p) { return [ox + p[0] * S / 100, oy + p[1] * S / 100]; });
+    pSpace = S / 100 * 0.5; pw = Math.max(28, S * 0.1);
+    [pG, pI].forEach(function (c) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); });
+    var ink = BLOCKS[ppos % BLOCKS.length][1];
+    pgx.setTransform(dpr, 0, 0, dpr, 0, 0); pgx.clearRect(0, 0, W, H);
+    pathStroke(pgx, 0, pS.length - 1, pw, 0.22, ink);
+    pix.setTransform(dpr, 0, 0, dpr, 0, 0); pix.clearRect(0, 0, W, H);
+    pathStroke(pix, 0, pPi, pw * 0.92, 0.88, ink);
+    Array.prototype.forEach.call(pathEl.querySelectorAll(".pmark"), function (m) { m.remove(); });
+    var fs = Math.max(34, Math.round(S * 0.13));
+    [[0, pMarks[0]], [pS.length - 1, pMarks[1]]].forEach(function (m) {
+      var e = document.createElement("span"); e.className = "pmark"; e.textContent = m[1]; e.setAttribute("aria-hidden", "true");
+      e.style.left = pS[m[0]][0] + "px"; e.style.top = pS[m[0]][1] + "px"; e.style.fontSize = fs + "px"; pathEl.appendChild(e);
+    });
+  }
+  function pathRender() {
+    clearTimeout(roundTimer); pDone = false; pPi = 0; pDrawing = null;
+    Array.prototype.forEach.call(pathEl.querySelectorAll(".badge,.dot"), function (d) { d.remove(); });
+    setColor(ppos);
+    pSamples = samplePath(PATHS[ppos]); pMarks = pick(PATH_MARKS);
+    document.getElementById("tcount").textContent = (ppos + 1) + " of " + PATHS.length;
+    layoutPath();
+  }
+  function pathGo(d) { ppos = (ppos + d + PATHS.length) % PATHS.length; pathRender(); }
+  function pathClear() { pathRender(); }
+  function pPt(e) { var r = pathEl.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  function pDist(a, b) { var dx = a[0] - b[0], dy = a[1] - b[1]; return Math.sqrt(dx * dx + dy * dy); }
+  pI.addEventListener("pointerdown", function (e) {
+    if (pDone || pDrawing !== null || !pS.length) return;
+    if (pDist(pPt(e), pS[pPi]) > pw * 1.6) return;   // start on the animal, or where the line stopped
+    pDrawing = e.pointerId;
+    try { pI.setPointerCapture(e.pointerId); } catch (x) {}
+    e.preventDefault();
+  });
+  pI.addEventListener("pointermove", function (e) {
+    if (e.pointerId !== pDrawing) return;
+    var p = pPt(e), look = Math.ceil(pw * 2.2 / pSpace), best = -1;
+    for (var j = pPi; j <= Math.min(pS.length - 1, pPi + look); j++) if (pDist(p, pS[j]) <= pw * 0.95) best = j;
+    if (best > pPi) {
+      pathStroke(pix, pPi, best, pw * 0.92, 0.88, BLOCKS[ppos % BLOCKS.length][1]);
+      pPi = best;
+      if (pPi >= pS.length - 3) {
+        pDone = true; pDrawing = null;
+        pathStroke(pix, 0, pS.length - 1, pw * 0.92, 0.88, BLOCKS[ppos % BLOCKS.length][1]);
+        celebrate(pathEl);
+        roundTimer = setTimeout(function () { pathGo(1); }, 2600);
+      }
+    }
+    e.preventDefault();
+  });
+  function pEnd(e) { if (e.pointerId === pDrawing) pDrawing = null; }
+  pI.addEventListener("pointerup", pEnd); pI.addEventListener("pointercancel", pEnd);
+  window.addEventListener("resize", function () { if (view === "path") layoutPath(); });
+
+  /* ================= Dot to dot ================= */
+  function ringPts(n, r, rot) { var a = []; for (var i = 0; i < n; i++) { var t = (rot + 360 * i / n) * Math.PI / 180; a.push([+(50 + r * Math.cos(t)).toFixed(1), +(50 + r * Math.sin(t)).toFixed(1)]); } return a; }
+  function starDots(n, ro, ri) { var a = []; for (var i = 0; i < 2 * n; i++) { var r = i % 2 ? ri : ro, t = (-90 + 180 * i / n) * Math.PI / 180; a.push([+(50 + r * Math.cos(t)).toFixed(1), +(50 + r * Math.sin(t)).toFixed(1)]); } return a; }
+  var pent = ringPts(5, 38, -90);
+  var DOTS = [
+    ["line", [[20, 50], [80, 50]], false],
+    ["triangle", [[50, 18], [86, 80], [14, 80]], true],
+    ["square", [[20, 20], [80, 20], [80, 80], [20, 80]], true],
+    ["house", [[20, 86], [20, 48], [50, 16], [80, 48], [80, 86]], true],
+    ["star", [pent[0], pent[2], pent[4], pent[1], pent[3]], true],
+    ["hexagon", ringPts(6, 38, -90), true],
+    ["arrow", [[10, 40], [56, 40], [56, 18], [90, 50], [56, 82], [56, 60], [10, 60]], true],
+    ["heart", [[50, 90], [16, 62], [10, 36], [24, 14], [42, 20], [50, 40], [58, 20], [76, 14], [90, 36], [84, 62]], true],
+    ["big star", starDots(5, 42, 18), true]
+  ];
+  var dpos = 0, dNext = 0, dDone = false;
+  var dotsEl = document.getElementById("dots"), dotsSvg = document.getElementById("dots-svg");
+  function dotsRender() {
+    clearTimeout(roundTimer); dDone = false; dNext = 0;
+    Array.prototype.forEach.call(dotsEl.querySelectorAll(".badge,.dot"), function (d) { d.remove(); });
+    setColor(dpos);
+    var ink = BLOCKS[dpos % BLOCKS.length][1], bg = BLOCKS[dpos % BLOCKS.length][0], pic = DOTS[dpos], pts = pic[1];
+    var h = '<polygon id="dp-fill" points="' + pts.map(function (p) { return p.join(","); }).join(" ") + '" fill="' + ink + '" fill-opacity="0"/>' +
+      '<g id="dp-lines" stroke="' + ink + '" stroke-width="2.6" stroke-linecap="round" fill="none"></g><g id="dp-dots">';
+    pts.forEach(function (p, i) {
+      h += '<g class="dd" data-i="' + i + '"><circle cx="' + p[0] + '" cy="' + p[1] + '" r="12" fill="transparent"/><circle class="dc" cx="' + p[0] + '" cy="' + p[1] + '" r="7.2" fill="' + ink + '"/>' +
+        '<text x="' + p[0] + '" y="' + p[1] + '" font-size="8.4" fill="' + bg + '" text-anchor="middle" dominant-baseline="central">' + (i + 1) + '</text></g>';
+    });
+    dotsSvg.innerHTML = h + '</g>';
+    Array.prototype.forEach.call(dotsSvg.querySelectorAll(".dd"), function (g) {
+      g.addEventListener("pointerdown", function (e) { e.preventDefault(); dotTap(+g.getAttribute("data-i")); });
+    });
+    dotsPulse();
+    document.getElementById("tcount").textContent = (dpos + 1) + " of " + DOTS.length;
+  }
+  function dotsPulse() {
+    Array.prototype.forEach.call(dotsSvg.querySelectorAll(".dc"), function (c, i) { c.classList.toggle("dpulse", i === dNext && !dDone); });
+  }
+  function dotLine(a, b) {
+    var l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    l.setAttribute("x1", a[0]); l.setAttribute("y1", a[1]); l.setAttribute("x2", b[0]); l.setAttribute("y2", b[1]);
+    document.getElementById("dp-lines").appendChild(l);
+  }
+  function dotTap(i) {
+    if (dDone || i !== dNext) return;
+    var pic = DOTS[dpos], pts = pic[1];
+    if (i > 0) dotLine(pts[i - 1], pts[i]);
+    if (i < NUMBER_ITEMS.length) sayItem(NUMBER_ITEMS[i], false, "numbers");
+    dNext++;
+    if (dNext >= pts.length) {
+      dDone = true;
+      if (pic[2]) dotLine(pts[pts.length - 1], pts[0]);
+      document.getElementById("dp-fill").setAttribute("fill-opacity", "0.16");
+      celebrate(dotsEl);
+      if (speak) setTimeout(function () { playKey("dots:" + pic[0], pic[0] + ".", ""); }, 700);
+      roundTimer = setTimeout(function () { dotsGo(1); }, 3200);
+    }
+    dotsPulse();
+  }
+  function dotsGo(d) { dpos = (dpos + d + DOTS.length) % DOTS.length; dotsRender(); }
+
+  // Back / Next / Clear are shared by the screens that step through a list.
+  var NAV = {
+    trace: { go: function (d) { traceGo(d); }, clear: function () { traceClear(); } },
+    path: { go: pathGo, clear: pathClear },
+    dots: { go: dotsGo, clear: function () { dotsRender(); } }
+  };
+
   /* ================= Memory cards ================= */
   var memPairs = 2, memItems = "animals", memOpen = [], memLock = false, memCards = [];
   var memEl = document.getElementById("mem"), memGrid = document.getElementById("mem-grid");
@@ -1390,6 +1572,8 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     ["next",     "What comes next", svgIcon({ svg: '<circle cx="14" cy="50" r="11" fill="#E04B4B"/><circle cx="40" cy="50" r="11" fill="#3F7FD6"/><circle cx="66" cy="50" r="11" fill="#E04B4B"/><rect x="82" y="38" width="16" height="24" rx="5" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="5 4"/>' })],
     ["memory",   "Memory cards",   svgIcon({ svg: '<rect x="8" y="22" width="40" height="56" rx="8" fill="currentColor" opacity=".55"/><rect x="52" y="22" width="40" height="56" rx="8" fill="currentColor"/><circle cx="72" cy="50" r="9" fill="#fff" opacity=".8"/>' })],
     ["pattern",  "Copy the pattern", svgIcon({ svg: '<circle cx="28" cy="28" r="16" fill="#E04B4B"/><circle cx="72" cy="28" r="16" fill="#3F7FD6"/><circle cx="28" cy="72" r="16" fill="#F2CB3D"/><circle cx="72" cy="72" r="16" fill="#4FAE5A"/>' })],
+    ["path",     "Follow the path", svgIcon({ svg: '<path d="M14 80 C14 30 50 70 50 40 C50 14 86 30 86 18" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" opacity=".35"/><circle cx="14" cy="80" r="9" fill="currentColor"/><circle cx="86" cy="18" r="9" fill="currentColor"/>' })],
+    ["dots",     "Dot to dot",     svgIcon({ svg: '<path d="M50 14 L86 80 L14 80 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="5 6"/><circle cx="50" cy="14" r="10" fill="currentColor"/><circle cx="86" cy="80" r="10" fill="currentColor"/><circle cx="14" cy="80" r="10" fill="currentColor"/>' })],
     ["words",    "Match words",    '<span class="hi sm">cat</span>'],
     ["pictures", "Match pictures", '<span class="hi emo">🍎</span>'],
     ["animals",  "Match animals",  '<span class="hi emo">🐶</span>'],
@@ -1399,15 +1583,15 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   var HOME_LAYOUTS = {
     topic: [
       ["Letters", ["learn", "letters", "trace-letters", "firstsounds"]],
-      ["Numbers", ["learn-numbers", "numbers", "trace-numbers", "counting"]],
+      ["Numbers", ["learn-numbers", "numbers", "trace-numbers", "counting", "dots"]],
       ["Colors and shapes", ["colors", "shapes", "trace-shapes"]],
       ["Pictures and words", ["words", "pictures", "animals", "abstract", "opposites", "rhymes", "sort"]],
-      ["Thinking games", ["bigsmall", "odd", "next", "memory", "pattern"]]
+      ["Thinking games", ["path", "bigsmall", "odd", "next", "memory", "pattern"]]
     ],
     type: [
       ["Learn", ["learn", "learn-numbers"]],
       ["Match", ["letters", "numbers", "colors", "shapes", "words", "pictures", "animals", "abstract", "opposites", "rhymes", "firstsounds", "sort"]],
-      ["Trace", ["trace-letters", "trace-numbers", "trace-shapes"]],
+      ["Trace", ["trace-letters", "trace-numbers", "trace-shapes", "path", "dots"]],
       ["Think and count", ["counting", "bigsmall", "odd", "next", "memory", "pattern"]]
     ]
   };
@@ -1445,7 +1629,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   function startGame(id) {
     if (id === "learn" || id === "learn-numbers") { setLearnSet(id === "learn" ? "letters" : "numbers"); setView("learn"); return; }
     if (id.indexOf("trace-") === 0) { tset = id.slice(6); tpos = 0; setView("trace"); return; }
-    if (id === "memory" || id === "pattern") { setView(id); return; }
+    if (id === "memory" || id === "pattern" || id === "path" || id === "dots") { setView(id); return; }
     game = id; lastId = null;
     if (id === "words" && mode === "upper") mode = "lower";
     setView("match");
@@ -1517,10 +1701,10 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       else if (view === "match" && game !== "counting" && target && target.name) sayItem(target, true);
     }
   }
-  ["speak-learn", "speak-match", "speak-trace", "speak-mem", "speak-pat"].forEach(function (id) { on(id, function () { setMuted(!muted); }); });
-  on("t-prev", function () { traceGo(-1); });
-  on("t-next", function () { traceGo(1); });
-  on("t-clear", traceClear);
+  ["speak-learn", "speak-match", "speak-trace", "speak-mem", "speak-pat", "speak-path", "speak-dots"].forEach(function (id) { on(id, function () { setMuted(!muted); }); });
+  on("t-prev", function () { NAV[view].go(-1); });
+  on("t-next", function () { NAV[view].go(1); });
+  on("t-clear", function () { NAV[view].clear(); });
   on("t-ok", traceOk);
   on("open-settings", function () { stopSounds(); refreshSettings(); settingsEl.classList.add("open"); document.getElementById("close-settings").focus(); });
   on("close-settings", function () { settingsEl.classList.remove("open"); });
