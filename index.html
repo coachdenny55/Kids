@@ -183,7 +183,8 @@ button.ctl.rec[aria-pressed="true"] { background: #a2362b; border-color: #a2362b
 .htile svg { width: 46cqmin; height: 46cqmin; }
 .htile b { font-size: clamp(13px, 10.5cqmin, 19px); text-align: center; line-height: 1.15; }
 #home .grid { gap: 10px; }
-#home h1 { margin-bottom: 12px; }
+#home h1 { margin-bottom: 10px; }
+#home-by { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 0 auto 14px; }
 /* Trace view: a big ghost glyph with a finger-drawing canvas on top */
 #trace { position: relative; flex: 1 1 auto; min-height: 0; display: none; margin: 10px; border-radius: 28px; touch-action: none; }
 #trace canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 28px; touch-action: none; }
@@ -195,7 +196,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
 </style>
 </head>
 <body data-view="home" data-game="letters" data-text="1">
-<div id="home"><h1>What shall we play?</h1><div class="grid" id="home-grid"></div></div>
+<div id="home"><h1>What shall we play?</h1><div class="opts" id="home-by" role="group" aria-label="Arrange games"></div><div class="grid" id="home-grid"></div></div>
 
 <div id="block" class="tile" role="img" aria-live="polite" aria-label="Letter A">
   <span id="letter">A</span>
@@ -1051,22 +1052,41 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
     ["animals",  "Match animals",  '<span class="hi emo">🐶</span>'],
     ["abstract", "Match patterns", svgIcon(ABSTRACT_ITEMS[0])]
   ];
-  // Games grouped by what they teach, one row per group.
-  var HOME_SECTIONS = [
-    ["Letters", ["learn", "letters", "trace-letters"]],
-    ["Numbers", ["learn-numbers", "numbers", "trace-numbers", "counting"]],
-    ["Colors and shapes", ["colors", "shapes", "trace-shapes"]],
-    ["Pictures and words", ["words", "pictures", "animals", "abstract"]]
-  ];
+  // Two ways to arrange the home screen: by what they teach (topic) or by how you play (game type).
+  var HOME_LAYOUTS = {
+    topic: [
+      ["Letters", ["learn", "letters", "trace-letters"]],
+      ["Numbers", ["learn-numbers", "numbers", "trace-numbers", "counting"]],
+      ["Colors and shapes", ["colors", "shapes", "trace-shapes"]],
+      ["Pictures and words", ["words", "pictures", "animals", "abstract"]]
+    ],
+    type: [
+      ["Learn", ["learn", "learn-numbers"]],
+      ["Match", ["letters", "numbers", "colors", "shapes", "words", "pictures", "animals", "abstract"]],
+      ["Trace", ["trace-letters", "trace-numbers", "trace-shapes"]],
+      ["Count", ["counting"]]
+    ]
+  };
+  var homeBy = "topic";
   function buildHome() {
-    var grid = document.getElementById("home-grid"), n = 0, byId = {};
-    HOME_TILES.forEach(function (t) { byId[t[0]] = t; });
-    HOME_SECTIONS.forEach(function (sec) {
+    var by = document.getElementById("home-by");
+    by.innerHTML = "";
+    [["topic", "By topic"], ["type", "By game type"]].forEach(function (o) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "ctl"; b.textContent = o[1];
+      b.setAttribute("aria-pressed", String(homeBy === o[0]));
+      b.addEventListener("click", function () { homeBy = o[0]; saveSettings(); buildHome(); });
+      by.appendChild(b);
+    });
+    var grid = document.getElementById("home-grid"), byId = {};
+    grid.innerHTML = "";
+    HOME_TILES.forEach(function (t, i) { byId[t[0]] = { t: t, i: i }; });
+    HOME_LAYOUTS[homeBy].forEach(function (sec) {
       var wrap = document.createElement("section"); wrap.className = "sec";
       wrap.innerHTML = "<h2>" + sec[0] + "</h2>";
       var row = document.createElement("div"); row.className = "row";
       sec[1].forEach(function (id) {
-        var t = byId[id], i = n++;
+        var t = byId[id].t, i = byId[id].i;
         var b = document.createElement("button");
         b.type = "button"; b.className = "htile";
         b.style.setProperty("--tb", BLOCKS[(i * 3) % BLOCKS.length][0]);
@@ -1095,7 +1115,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
 
   /* ================= Remember settings on this device ================= */
   function saveSettings() {
-    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, muted: muted })); } catch (e) {}
+    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, muted: muted, homeBy: homeBy })); } catch (e) {}
   }
   function loadSettings() {
     try {
@@ -1107,6 +1127,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
       if ([0, 2, 3, 4].indexOf(o.wordLen) >= 0) wordLen = o.wordLen;
       if (typeof o.pics === "boolean") pics = o.pics;
       if (typeof o.muted === "boolean") muted = o.muted;
+      if (o.homeBy === "topic" || o.homeBy === "type") homeBy = o.homeBy;
     } catch (e) {}
   }
 
@@ -1162,11 +1183,11 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
     else if (e.key === "ArrowLeft") go(-1);
   });
 
-  buildHome();
   buildVoiceTabs();
   buildVoiceRows();
   loadVoices();
   loadSettings();
+  buildHome();
   paintMute();
   updateFlags();
   renderLearn();
