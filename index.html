@@ -208,6 +208,30 @@ body:not([data-view="dots"]) .vo-dots, body:not([data-view="rhyme"]) .vo-rhyme {
 body:not([data-view="trace"]):not([data-view="path"]):not([data-view="dots"]):not([data-view="rhyme"]) .nav-only { display: none !important; }
 body:not([data-view="trace"]):not([data-view="path"]):not([data-view="dots"]) .clear-only { display: none !important; }
 body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
+/* Memory cards */
+#mem { padding: 10px; }
+#mem-grid { flex: 1 1 auto; min-height: 0; width: 100%; display: grid; gap: 12px; grid-auto-rows: 1fr; }
+.card { position: relative; border: 0; border-radius: 22px; background: #dcd9d3; padding: 0; cursor: pointer; container-type: size; transition: background-color .25s ease; }
+.card .cf { visibility: hidden; width: 100%; height: 100%; background: transparent; font-size: min(18vw, 10vh); font-size: 58cqmin; }
+.card.up .cf, .card.match .cf { visibility: visible; }
+.card.up { background: var(--bg); }
+.card.match { background: #A9CDA0; pointer-events: none; }
+/* Copy the pattern */
+#pat { flex-direction: column; gap: 14px; padding: 10px 10px 14px; }
+.pbox { position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; border-radius: 28px; }
+#pat-key { flex: 1 1 0; }
+#pat-ans { flex: 1.15 1 0; background: rgba(255,255,255,.35); }
+#pat-pal { flex: 0 0 20%; min-height: 0; display: flex; justify-content: center; gap: 12px; }
+.pgrid { display: grid; gap: calc(var(--cs) * .12); }
+.pcell { width: var(--cs); height: var(--cs); border-radius: 26%; background: rgba(255,255,255,.62); font-size: calc(var(--cs) * .6); }
+.pcell.e { background: rgba(0,0,0,.09); }
+.pcell.pop { animation: pop .5s ease both; }
+.pcell.shake { animation: shake .4s ease; }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.pal { flex: 1 1 0; min-width: 0; max-width: 200px; border-radius: 22px; background: #dcd9d3; color: #3a3733; font-size: min(14vw, 9vh); cursor: pointer; }
+.pal[aria-pressed="true"] { box-shadow: 0 0 0 6px rgba(58,55,51,.6); }
+.pkhide { position: absolute; inset: 0; z-index: 2; border: 0; border-radius: 28px; background: var(--bg); color: var(--ink); font: 700 min(30vw, 18vh)/1 var(--font-letter); cursor: pointer; display: none; align-items: center; justify-content: center; }
+.pkhide.on { display: flex; }
 /* sequence shown in "What comes next" */
 .seq { display: flex; align-items: center; justify-content: center; gap: min(2vw, 1.4vh); }
 .seq .sq { width: var(--sqw); height: var(--sqw); display: flex; align-items: center; justify-content: center; font-family: var(--font-emoji); font-weight: 400; font-size: calc(var(--sqw) * .78); line-height: 1; flex: 0 0 auto; }
@@ -234,6 +258,18 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
 <div id="trace" class="tile" role="img" aria-label="Trace">
   <canvas id="tc-ghost"></canvas><canvas id="tc-ink"></canvas>
   <button class="speaker" id="speak-trace" type="button" aria-label="Say it"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+</div>
+
+<div id="mem" class="vw">
+  <div id="mem-grid"></div>
+  <button class="speaker" id="speak-mem" type="button" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"></svg></button>
+</div>
+
+<div id="pat" class="vw">
+  <div id="pat-key" class="pbox tile"><div class="pgrid" id="pk-grid"></div><button class="pkhide" id="pk-hide" type="button" aria-label="Show the pattern again">?</button></div>
+  <div id="pat-ans" class="pbox"><div class="pgrid" id="pa-grid"></div></div>
+  <div id="pat-pal" role="group" aria-label="Choices"></div>
+  <button class="speaker" id="speak-pat" type="button" aria-label="Sound"><svg viewBox="0 0 24 24" aria-hidden="true"></svg></button>
 </div>
 
 <div id="strip" role="group" aria-label="Grown-up controls">
@@ -270,6 +306,14 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     <div class="setrow match-only"><h3>Answer blocks</h3><div class="opts" id="opt-count"></div></div>
     <div class="setrow text-only"><h3>Letter style</h3><div class="opts" id="opt-case"></div>
       <p class="hint">Aa shows the big capital, and he finds the little one (or in Learn, shows both).</p></div>
+    <div class="setrow vo-memory"><h3>How many pairs</h3><div class="opts" id="opt-mpairs"></div></div>
+    <div class="setrow vo-memory"><h3>What's on the cards</h3><div class="opts" id="opt-mitems"></div></div>
+    <div class="setrow vo-pattern"><h3>Grid size</h3><div class="opts" id="opt-psize"></div>
+      <p class="hint">Start with 3 in a row, then work up to 2x2, 3x3 and 4x4.</p></div>
+    <div class="setrow vo-pattern"><h3>What to copy</h3><div class="opts" id="opt-pitems"></div></div>
+    <div class="setrow vo-pattern"><h3>How many to choose from</h3><div class="opts" id="opt-pcount"></div></div>
+    <div class="setrow vo-pattern"><h3>Hide the pattern after</h3><div class="opts" id="opt-phide"></div>
+      <p class="hint">A memory game: the top pattern disappears after this many seconds. Tap the top box to peek again.</p></div>
     <div class="setrow learn-only"><h3>Order</h3><div class="opts" id="opt-order"></div></div>
     <div class="setrow learn-only letters-only"><h3>Picture under each letter</h3><div class="opts" id="opt-pics"></div></div>
     <div class="setrow"><h3>Your voice</h3>
@@ -884,10 +928,10 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   /* ================= View and settings ================= */
   function setView(v) {
     view = v;
-    clearTimeout(roundTimer);
+    clearTimeout(roundTimer); clearTimeout(patTimer);
     stopSounds();
     updateFlags();
-    if (v === "match") { lastId = null; newRound(); } else if (v === "trace") renderTrace(); else renderLearn();
+    if (v === "match") { lastId = null; newRound(); } else if (v === "trace") renderTrace(); else if (v === "memory") renderMem(); else if (v === "pattern") renderPat(); else renderLearn();
     refreshSettings();
   }
   function setGame(g) {
@@ -922,6 +966,15 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       function (v) { return v === Math.min(poolIdx, GAMES[game].labels.length - 1); }, function (v) { poolIdx = v; lastId = null; newRound(); });
     group("opt-count", [2, 3, 4, 5, 6].map(function (n) { return { value: n, label: String(n) }; }),
       function (v) { return v === optCount; }, function (v) { optCount = v; newRound(); });
+    group("opt-mpairs", [2, 3, 4, 6].map(function (n) { return { value: n, label: n + " pairs" }; }), function (v) { return v === memPairs; }, function (v) { memPairs = v; if (view === "memory") renderMem(); });
+    group("opt-mitems", [["animals", "Animals"], ["pictures", "Pictures"], ["colors", "Colors"], ["shapes", "Shapes"]].map(function (o) { return { value: o[0], label: o[1] }; }),
+      function (v) { return v === memItems; }, function (v) { memItems = v; if (view === "memory") renderMem(); });
+    group("opt-psize", PAT_SIZES.map(function (d, i) { return { value: i, label: d[2] }; }), function (v) { return v === patSize; }, function (v) { patSize = v; if (view === "pattern") renderPat(); });
+    group("opt-pitems", [["colors", "Colors"], ["shapes", "Shapes"], ["letters", "Letters"], ["numbers", "Numbers"], ["animals", "Animals"]].map(function (o) { return { value: o[0], label: o[1] }; }),
+      function (v) { return v === patItems; }, function (v) { patItems = v; if (view === "pattern") renderPat(); });
+    group("opt-pcount", [2, 3, 4, 5, 6].map(function (n) { return { value: n, label: String(n) }; }), function (v) { return v === patCount; }, function (v) { patCount = v; if (view === "pattern") renderPat(); });
+    group("opt-phide", [[0, "Never"], [3, "3 sec"], [5, "5 sec"], [10, "10 sec"]].map(function (o) { return { value: o[0], label: o[1] }; }),
+      function (v) { return v === patHide; }, function (v) { patHide = v; if (view === "pattern") renderPat(); });
     group("opt-auto", [{ value: true, label: "On" }, { value: false, label: "Off" }],
       function (v) { return v === speak; }, function (v) { speak = v; if (!v) stopSounds(); });
     group("opt-case", [{ value: "upper", label: "ABC" }, { value: "lower", label: "abc" }, { value: "both", label: "Aa" }],
@@ -1188,6 +1241,133 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     roundTimer = setTimeout(function () { traceGo(1); }, 2200);
   }
 
+  /* ================= Memory cards ================= */
+  var memPairs = 2, memItems = "animals", memOpen = [], memLock = false, memCards = [];
+  var memEl = document.getElementById("mem"), memGrid = document.getElementById("mem-grid");
+  function memPool() {
+    return memItems === "pictures" ? PICTURE_ITEMS.slice(0, 30) : memItems === "colors" ? COLOR_ITEMS.slice(0, 12) :
+      memItems === "shapes" ? SHAPE_ITEMS.slice(0, 20) : ANIMAL_ITEMS.slice(0, 24);
+  }
+  function memCols(total) {
+    var land = window.innerWidth > window.innerHeight;
+    return total <= 4 ? 2 : land ? Math.min(4, Math.ceil(total / 2)) : total <= 8 ? 2 : 3;
+  }
+  function layoutMem() { memGrid.style.gridTemplateColumns = "repeat(" + memCols(memCards.length) + ", minmax(0, 1fr))"; }
+  function renderMem() {
+    clearTimeout(roundTimer); memOpen = []; memLock = false;
+    Array.prototype.forEach.call(memEl.querySelectorAll(".badge,.dot"), function (d) { d.remove(); });
+    var ci; do { ci = Math.floor(Math.random() * BLOCKS.length); } while (ci === lastColor); lastColor = ci; setColor(ci);
+    var chosen = distinctBy(memPool(), memPairs);
+    memCards = shuffled(chosen.concat(chosen)).map(function (it) { return { item: it, up: false, done: false }; });
+    memGrid.innerHTML = "";
+    memCards.forEach(function (c) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "card";
+      var f = document.createElement("span"); f.className = "tile cf"; fill(f, c.item, "choice"); b.appendChild(f);
+      b.setAttribute("aria-label", "Card");
+      b.addEventListener("pointerdown", function () { memTap(c, b); });
+      b.addEventListener("click", function (e) { if (e.detail === 0) memTap(c, b); });
+      c.el = b; memGrid.appendChild(b);
+    });
+    layoutMem();
+  }
+  function memTap(c, b) {
+    if (memLock || c.up || c.done) return;
+    c.up = true; b.classList.add("up"); memOpen.push(c);
+    if (memOpen.length < 2) return;
+    var a = memOpen[0], d = memOpen[1];
+    if (a.item.id === d.item.id) {
+      a.done = d.done = true; a.el.classList.add("match"); d.el.classList.add("match"); memOpen = [];
+      if (speak && a.item.name) playKey("mem:" + a.item.id, a.item.name + ".", "");
+      if (memCards.every(function (x) { return x.done; })) { celebrate(memEl); roundTimer = setTimeout(renderMem, 2800); }
+    } else {
+      memLock = true;
+      roundTimer = setTimeout(function () { a.up = d.up = false; a.el.classList.remove("up"); d.el.classList.remove("up"); memOpen = []; memLock = false; }, 1100);
+    }
+  }
+  window.addEventListener("resize", function () { if (view === "memory") layoutMem(); });
+
+  /* ================= Copy the pattern ================= */
+  var PAT_SIZES = [[1, 3, "3 in a row"], [2, 2, "2 x 2"], [2, 3, "2 x 3"], [3, 3, "3 x 3"], [4, 4, "4 x 4"]];
+  var patSize = 0, patItems = "colors", patCount = 3, patHide = 0, patKey = [], patFilled = 0, patSel = null, patPal = [], patTimer = null, patLocked = false, patCells = [];
+  var pkGrid = document.getElementById("pk-grid"), paGrid = document.getElementById("pa-grid"), pkHide = document.getElementById("pk-hide");
+  var patEl = document.getElementById("pat"), patAns = document.getElementById("pat-ans"), patPalEl = document.getElementById("pat-pal");
+  function patSet() {
+    if (patItems === "shapes") return SHAPE_ITEMS.filter(function (x) { return ["circle", "square", "triangle", "star", "heart", "diamond", "hexagon", "plus"].indexOf(x.id) >= 0; });
+    if (patItems === "letters") return LETTER_ITEMS.slice(0, 12);
+    if (patItems === "numbers") return NUMBER_ITEMS.slice(0, 9);
+    if (patItems === "animals") return ANIMAL_ITEMS.slice(0, 12);
+    return COLOR_ITEMS.slice(0, 9);
+  }
+  function patCell(item, cls) {
+    var d = document.createElement("div");
+    d.className = "tile pcell " + (cls || "");
+    if (item) fill(d, item, "choice");
+    return d;
+  }
+  function layoutPat() {
+    var d = PAT_SIZES[patSize], rows = d[0], cols = d[1];
+    var k = document.getElementById("pat-key"), W = k.clientWidth, H = k.clientHeight;
+    if (!W || !H) return;
+    var a = patAns, W2 = a.clientWidth, H2 = a.clientHeight;
+    var cs = Math.floor(Math.min((Math.min(W, W2) - 40) / cols, (Math.min(H, H2) - 40) / rows) * 0.88);
+    cs = Math.max(30, Math.min(cs, 190));
+    [pkGrid, paGrid].forEach(function (g) {
+      g.style.setProperty("--cs", cs + "px");
+      g.style.gridTemplateColumns = "repeat(" + cols + ", " + cs + "px)";
+    });
+  }
+  function showKey() { clearTimeout(patTimer); pkHide.classList.remove("on"); pkGrid.style.visibility = "visible"; if (patHide && !patLocked) patTimer = setTimeout(hideKey, patHide * 1000); }
+  function hideKey() { pkHide.classList.add("on"); pkGrid.style.visibility = "hidden"; }
+  function renderPat() {
+    clearTimeout(roundTimer); clearTimeout(patTimer); patLocked = false; patFilled = 0;
+    Array.prototype.forEach.call(patEl.querySelectorAll(".badge,.dot"), function (d) { d.remove(); });
+    var ci; do { ci = Math.floor(Math.random() * BLOCKS.length); } while (ci === lastColor); lastColor = ci; setColor(ci);
+    var d = PAT_SIZES[patSize], n = d[0] * d[1];
+    patPal = distinctBy(patSet(), Math.min(patCount, patSet().length));
+    var ids = shuffled(patPal), keyItems = [];
+    for (var i = 0; i < n; i++) keyItems.push(i < ids.length ? ids[i] : pick(patPal));
+    patKey = shuffled(keyItems);
+    pkGrid.innerHTML = ""; paGrid.innerHTML = ""; patCells = [];
+    patKey.forEach(function (it, i) {
+      pkGrid.appendChild(patCell(it, "k"));
+      var e = patCell(null, "e");
+      e.addEventListener("pointerdown", function () { patTap(i, e); });
+      paGrid.appendChild(e); patCells.push(e);
+    });
+    patPalEl.innerHTML = "";
+    patSel = patPal[0].id;
+    patPal.forEach(function (it) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "tile pal"; fill(b, it, "choice");
+      b.setAttribute("aria-label", it.name || "Choice");
+      b.setAttribute("aria-pressed", String(it.id === patSel));
+      b.addEventListener("pointerdown", function () {
+        patSel = it.id;
+        Array.prototype.forEach.call(patPalEl.children, function (c) { c.setAttribute("aria-pressed", String(c === b)); });
+      });
+      patPalEl.appendChild(b);
+    });
+    layoutPat();
+    showKey();
+  }
+  function patTap(i, el) {
+    if (patLocked || el.classList.contains("full") || !patSel) return;
+    var want = patKey[i];
+    if (want.id === patSel) {
+      el.classList.remove("e", "shake"); el.classList.add("full", "pop"); fill(el, want, "choice");
+      if (++patFilled === patKey.length) {
+        patLocked = true; showKey(); clearTimeout(patTimer);
+        celebrate(patAns);
+        roundTimer = setTimeout(renderPat, 2800);
+      }
+    } else {
+      el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake");
+    }
+  }
+  pkHide.addEventListener("pointerdown", function () { showKey(); });
+  window.addEventListener("resize", function () { if (view === "pattern") layoutPat(); });
+
   /* ================= Home screen ================= */
   function svgIcon(item) { return '<svg viewBox="0 0 100 100" aria-hidden="true">' + item.svg + '</svg>'; }
   var HOME_TILES = [
@@ -1208,6 +1388,8 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     ["bigsmall", "Big and small",  svgIcon({ svg: '<circle cx="38" cy="54" r="30" fill="currentColor"/><circle cx="80" cy="74" r="12" fill="currentColor"/>' })],
     ["odd",      "Odd one out",    svgIcon({ svg: '<circle cx="24" cy="30" r="15" fill="currentColor"/><circle cx="62" cy="30" r="15" fill="currentColor"/><circle cx="24" cy="72" r="15" fill="currentColor"/><rect x="48" y="58" width="30" height="30" rx="4" fill="currentColor" opacity=".55"/>' })],
     ["next",     "What comes next", svgIcon({ svg: '<circle cx="14" cy="50" r="11" fill="#E04B4B"/><circle cx="40" cy="50" r="11" fill="#3F7FD6"/><circle cx="66" cy="50" r="11" fill="#E04B4B"/><rect x="82" y="38" width="16" height="24" rx="5" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="5 4"/>' })],
+    ["memory",   "Memory cards",   svgIcon({ svg: '<rect x="8" y="22" width="40" height="56" rx="8" fill="currentColor" opacity=".55"/><rect x="52" y="22" width="40" height="56" rx="8" fill="currentColor"/><circle cx="72" cy="50" r="9" fill="#fff" opacity=".8"/>' })],
+    ["pattern",  "Copy the pattern", svgIcon({ svg: '<circle cx="28" cy="28" r="16" fill="#E04B4B"/><circle cx="72" cy="28" r="16" fill="#3F7FD6"/><circle cx="28" cy="72" r="16" fill="#F2CB3D"/><circle cx="72" cy="72" r="16" fill="#4FAE5A"/>' })],
     ["words",    "Match words",    '<span class="hi sm">cat</span>'],
     ["pictures", "Match pictures", '<span class="hi emo">🍎</span>'],
     ["animals",  "Match animals",  '<span class="hi emo">🐶</span>'],
@@ -1220,13 +1402,13 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       ["Numbers", ["learn-numbers", "numbers", "trace-numbers", "counting"]],
       ["Colors and shapes", ["colors", "shapes", "trace-shapes"]],
       ["Pictures and words", ["words", "pictures", "animals", "abstract", "opposites", "rhymes", "sort"]],
-      ["Thinking games", ["bigsmall", "odd", "next"]]
+      ["Thinking games", ["bigsmall", "odd", "next", "memory", "pattern"]]
     ],
     type: [
       ["Learn", ["learn", "learn-numbers"]],
       ["Match", ["letters", "numbers", "colors", "shapes", "words", "pictures", "animals", "abstract", "opposites", "rhymes", "firstsounds", "sort"]],
       ["Trace", ["trace-letters", "trace-numbers", "trace-shapes"]],
-      ["Think and count", ["counting", "bigsmall", "odd", "next"]]
+      ["Think and count", ["counting", "bigsmall", "odd", "next", "memory", "pattern"]]
     ]
   };
   var homeBy = "topic";
@@ -1263,13 +1445,14 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   function startGame(id) {
     if (id === "learn" || id === "learn-numbers") { setLearnSet(id === "learn" ? "letters" : "numbers"); setView("learn"); return; }
     if (id.indexOf("trace-") === 0) { tset = id.slice(6); tpos = 0; setView("trace"); return; }
+    if (id === "memory" || id === "pattern") { setView(id); return; }
     game = id; lastId = null;
     if (id === "words" && mode === "upper") mode = "lower";
     setView("match");
   }
   function showHome() {
     view = "home";
-    clearTimeout(roundTimer);
+    clearTimeout(roundTimer); clearTimeout(patTimer);
     stopSounds();
     updateFlags();
     refreshSettings();
@@ -1277,7 +1460,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
 
   /* ================= Remember settings on this device ================= */
   function saveSettings() {
-    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, muted: muted, homeBy: homeBy })); } catch (e) {}
+    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, muted: muted, homeBy: homeBy, memPairs: memPairs, memItems: memItems, patSize: patSize, patItems: patItems, patCount: patCount, patHide: patHide })); } catch (e) {}
   }
   function loadSettings() {
     try {
@@ -1290,6 +1473,12 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       if (typeof o.pics === "boolean") pics = o.pics;
       if (typeof o.muted === "boolean") muted = o.muted;
       if (o.homeBy === "topic" || o.homeBy === "type") homeBy = o.homeBy;
+      if ([2, 3, 4, 6].indexOf(o.memPairs) >= 0) memPairs = o.memPairs;
+      if (["animals", "pictures", "colors", "shapes"].indexOf(o.memItems) >= 0) memItems = o.memItems;
+      if (o.patSize >= 0 && o.patSize < PAT_SIZES.length) patSize = o.patSize;
+      if (["colors", "shapes", "letters", "numbers", "animals"].indexOf(o.patItems) >= 0) patItems = o.patItems;
+      if ([2, 3, 4, 5, 6].indexOf(o.patCount) >= 0) patCount = o.patCount;
+      if ([0, 3, 5, 10].indexOf(o.patHide) >= 0) patHide = o.patHide;
     } catch (e) {}
   }
 
@@ -1328,7 +1517,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       else if (view === "match" && game !== "counting" && target && target.name) sayItem(target, true);
     }
   }
-  ["speak-learn", "speak-match", "speak-trace"].forEach(function (id) { on(id, function () { setMuted(!muted); }); });
+  ["speak-learn", "speak-match", "speak-trace", "speak-mem", "speak-pat"].forEach(function (id) { on(id, function () { setMuted(!muted); }); });
   on("t-prev", function () { traceGo(-1); });
   on("t-next", function () { traceGo(1); });
   on("t-clear", traceClear);
