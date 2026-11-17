@@ -52,6 +52,7 @@ button.tile { cursor: pointer; }
 #block, #target { cursor: pointer; }
 .cgrid { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; }
 .speaker[hidden] { display: none; }
+.speaker.muted { background: rgba(255,255,255,.35); opacity: .9; }
 .cgrid span { font-family: var(--font-emoji); font-weight: 400; line-height: 1; text-align: center; }
 body[data-learnset="numbers"] .letters-only { display: none !important; }
 .tile.emoji { font-family: var(--font-emoji); font-weight: 400; }
@@ -107,7 +108,7 @@ svg .wk { fill: none; stroke: #fff; opacity: .75; stroke-width: 4; stroke-lineca
 /* Home screen */
 #home { flex: 1 1 auto; min-height: 0; display: none; overflow-y: auto; padding: 22px 14px 14px; }
 #home h1 { font-size: 22px; text-align: center; margin: 0 0 16px; font-weight: 700; }
-#home .grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; max-width: 900px; margin: 0 auto; }
+#home .grid { margin-block: auto; width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; max-width: 900px; margin-inline: auto; }
 .htile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; aspect-ratio: 1 / 1.05;
   border: 0; border-radius: 28px; padding: 14px; background: var(--tb); color: var(--ti); font-family: var(--font-letter); cursor: pointer; }
 .htile:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
@@ -118,7 +119,7 @@ svg .wk { fill: none; stroke: #fff; opacity: .75; stroke-width: 4; stroke-lineca
 .htile svg { width: min(17vw, 10vh); height: min(17vw, 10vh); display: block; }
 .htile b { font-size: 17px; font-weight: 700; }
 body[data-view="home"] #block, body[data-view="home"] #match { display: none; }
-body[data-view="home"] #home { display: flex; flex-direction: column; justify-content: center; }
+body[data-view="home"] #home { display: flex; flex-direction: column; }
 body[data-view="home"] .game-only, body[data-view="home"] .learn-only, body[data-view="home"] .match-only { display: none !important; }
 body[data-view="match"] #block { display: none; }
 body[data-view="match"] #match { display: flex; }
@@ -228,7 +229,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
       <button class="ctl" id="close-settings" type="button">Done</button>
     </header>
     <div class="setrow"><h3>Say it out loud automatically</h3><div class="opts" id="opt-auto"></div>
-      <p class="hint">Tap the big letter, or the speaker button in its corner, any time to hear it.</p></div>
+      <p class="hint">Tap the big letter any time to hear it. The speaker button in the corner turns all sound on or off (a line through it means off).</p></div>
     <div class="setrow match-only words-only"><h3>Word length</h3><div class="opts" id="opt-wordlen"></div></div>
     <div class="setrow match-only"><h3>How many to practice</h3><div class="opts" id="opt-pool"></div>
       <p class="hint">Start small. The game uses the first ones in the list, which are the easiest.</p></div>
@@ -239,7 +240,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
     <div class="setrow learn-only letters-only"><h3>Picture under each letter</h3><div class="opts" id="opt-pics"></div></div>
     <div class="setrow"><h3>Your voice</h3>
       <button class="ctl" id="open-voices" type="button">Record your voice</button>
-      <p class="hint">Tap the big letter or the speaker button to hear it. Anything you haven't recorded uses the computer voice.</p></div>
+      <p class="hint">Tap the big letter to hear it. Anything you haven't recorded uses the computer voice.</p></div>
   </div>
 </div>
 
@@ -493,8 +494,10 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
     } catch (e) {}
   }
   function vkey(g, item) { return g === "letters" ? item.id : g + ":" + item.id; }
+  var muted = false, bypassMute = false;
   function playKey(key, fallback, after) {
     stopSounds();
+    if (muted && !bypassMute) return;
     var url = voices[key];
     if (url) {
       var a = new Audio(url);
@@ -809,7 +812,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
           '<button class="ctl" type="button" data-act="remove">Remove</button>' +
         '</div>';
       row.querySelector('[data-act="rec"]').addEventListener("click", function () { toggleRecord(key); });
-      row.querySelector('[data-act="play"]').addEventListener("click", function () { sayItem(item, true, vgame); });
+      row.querySelector('[data-act="play"]').addEventListener("click", function () { bypassMute = true; sayItem(item, true, vgame); bypassMute = false; });
       row.querySelector('[data-act="remove"]').addEventListener("click", function () { removeVoice(key); });
       listEl.appendChild(row);
       rowEls.push({ key: key, item: item, el: row });
@@ -872,7 +875,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
     renderVoiceRows();
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
     dbDo("readwrite", function (st) { st.put(blob, key); }).catch(function () { storeOK = false; renderVoiceRows(); });
-    playKey(key, "", "");
+    bypassMute = true; playKey(key, "", ""); bypassMute = false;
   }
   function removeVoice(key) {
     if (voices[key]) URL.revokeObjectURL(voices[key]);
@@ -1065,7 +1068,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
 
   /* ================= Remember settings on this device ================= */
   function saveSettings() {
-    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics })); } catch (e) {}
+    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, muted: muted })); } catch (e) {}
   }
   function loadSettings() {
     try {
@@ -1076,6 +1079,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
       if ([0, 1, 2, 3].indexOf(o.poolIdx) >= 0) poolIdx = o.poolIdx;
       if ([0, 2, 3, 4].indexOf(o.wordLen) >= 0) wordLen = o.wordLen;
       if (typeof o.pics === "boolean") pics = o.pics;
+      if (typeof o.muted === "boolean") muted = o.muted;
     } catch (e) {}
   }
 
@@ -1097,9 +1101,24 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
   }
   block.addEventListener("pointerdown", function (e) { if (!e.target.closest(".speaker")) sayBig(); });
   targetEl.addEventListener("pointerdown", sayBig);
-  on("speak-learn", sayBig);
-  on("speak-match", sayBig);
-  on("speak-trace", function () { traceSay(true); });
+  var ICON_ON = '<path d="M3 9v6h4l5 4V5L7 9H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+  var ICON_OFF = '<path d="M3 9v6h4l5 4V5L7 9H3z" fill="currentColor"/><path d="M3.5 3.5 L20.5 20.5" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M3.5 3.5 L20.5 20.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>';
+  function paintMute() {
+    Array.prototype.forEach.call(document.querySelectorAll(".speaker"), function (b) {
+      b.querySelector("svg").innerHTML = muted ? ICON_OFF : ICON_ON;
+      b.classList.toggle("muted", muted);
+      b.setAttribute("aria-pressed", String(muted));
+      b.setAttribute("aria-label", muted ? "Sound is off. Tap to turn sound on" : "Sound is on. Tap to turn sound off");
+    });
+  }
+  function setMuted(m, quiet) {
+    muted = m; stopSounds(); paintMute(); saveSettings();
+    if (!m && !quiet) { // turning sound back on: say the current one so it's clear it works
+      if (view === "learn") sayLearn(true); else if (view === "trace") traceSay(true);
+      else if (view === "match" && game !== "counting" && target && target.name) sayItem(target, true);
+    }
+  }
+  ["speak-learn", "speak-match", "speak-trace"].forEach(function (id) { on(id, function () { setMuted(!muted); }); });
   on("t-prev", function () { traceGo(-1); });
   on("t-next", function () { traceGo(1); });
   on("t-clear", traceClear);
@@ -1121,6 +1140,7 @@ body:not([data-view="trace"]) .trace-only { display: none !important; }
   buildVoiceRows();
   loadVoices();
   loadSettings();
+  paintMute();
   updateFlags();
   renderLearn();
   refreshSettings();
