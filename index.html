@@ -130,6 +130,8 @@ body[data-view="match"] #match { display: flex; }
 body[data-view="learn"] .match-only { display: none !important; }
 body[data-view="match"] .learn-only { display: none !important; }
 body:not([data-game="words"]) .words-only { display: none !important; }
+body:is([data-game="counting"],[data-game="opposites"],[data-game="rhymes"],[data-game="firstsounds"],[data-game="sort"],[data-game="bigsmall"],[data-game="odd"],[data-game="next"],[data-game="abstract"]) .listen-row { display: none !important; }
+#target.listen svg { color: rgba(255,255,255,.9); }
 body[data-text="0"] .text-only { display: none !important; }
 
 #strip {
@@ -340,6 +342,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     <div class="setrow match-only"><h3>How many to practice</h3><div class="opts" id="opt-pool"></div>
       <p class="hint">Start small. The game uses the first ones in the list, which are the easiest.</p></div>
     <div class="setrow match-only"><h3>Answer blocks</h3><div class="opts" id="opt-count"></div></div>
+    <div class="setrow match-only listen-row"><h3>How to play</h3><div class="opts" id="opt-listen"></div></div>
     <div class="setrow text-only"><h3>Letter style</h3><div class="opts" id="opt-case"></div>
       <p class="hint">Aa shows the big capital, and he finds the little one (or in Learn, shows both).</p></div>
     <div class="setrow vo-memory"><h3>How many pairs</h3><div class="opts" id="opt-mpairs"></div></div>
@@ -645,7 +648,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     } catch (e) { if (done) done(); }
   }
   function vkey(g, item) { return g === "letters" ? item.id : g + ":" + item.id; }
-  var muted = false, bypassMute = false;
+  var muted = false, bypassMute = false, listen = false;
   // done (optional) runs once the voice has finished, or at once if nothing will be said.
   function playKey(key, fallback, after, done) {
     stopSounds();
@@ -883,10 +886,16 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     if (!answerMapCache[g]) { var m = {}; GAMES[g].answers.forEach(function (a) { m[a.id] = a; }); answerMapCache[g] = m; }
     return answerMapCache[g];
   }
+  var SPK_BIG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  // Listen and pick: the big block hides its picture and the app says the name instead. Needs sound on.
+  function listenOn() {
+    var g = GAMES[game];
+    return listen && !muted && !g.answers && !g.custom && game !== "counting" && game !== "abstract";
+  }
   function newRound() {
     clearTimeout(roundTimer);
     locked = false;
-    targetEl.classList.remove("win");
+    targetEl.classList.remove("win", "listen");
     var cfg = GAMES[game], opts, k, t;
     var ci; do { ci = Math.floor(Math.random() * BLOCKS.length); } while (ci === lastColor);
     lastColor = ci; setColor(ci);
@@ -916,6 +925,13 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       if (game === "counting") { fillCount(t); targetEl.setAttribute("aria-label", "Count them"); }
       else { fill(targetEl, t, "target"); targetEl.setAttribute("aria-label", "Find the match" + (t.name ? ": " + t.name : "")); }
       document.getElementById("speak-match").hidden = !t.name || game === "counting";
+      if (listenOn()) {
+        targetEl.classList.remove("emoji"); targetEl.classList.add("listen", "svgi");
+        targetEl.innerHTML = SPK_BIG; targetEl.style.background = ""; targetEl.style.boxShadow = "";
+        targetEl.setAttribute("aria-label", "Listen, then pick. Tap to hear it again");
+        var lt = t;
+        setTimeout(function () { if (view === "match" && target === lt && !locked) sayItem(lt, true); }, 450);
+      }
     }
     choicesEl.className = k === 3 ? "three" : k > 3 ? "many c" + k : "";
     choicesEl.innerHTML = "";
@@ -1038,6 +1054,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       locked = true;
       Array.prototype.forEach.call(choicesEl.children, function (c) { if (c !== btn) c.classList.add("gone"); });
       btn.classList.add("picked");
+      if (targetEl.classList.contains("listen")) { targetEl.classList.remove("listen"); fill(targetEl, target, "target"); }
       targetEl.classList.add("win");
       celebrate(btn, true);
       onCorrect(item);
@@ -1090,6 +1107,8 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       function (v) { return v === Math.min(poolIdx, GAMES[game].labels.length - 1); }, function (v) { poolIdx = v; lastId = null; newRound(); });
     group("opt-count", [2, 3, 4, 5, 6].map(function (n) { return { value: n, label: String(n) }; }),
       function (v) { return v === optCount; }, function (v) { optCount = v; newRound(); });
+    group("opt-listen", [{ value: false, label: "Look and match" }, { value: true, label: "Listen and pick" }],
+      function (v) { return v === listen; }, function (v) { listen = v; lastId = null; newRound(); });
     group("opt-mpairs", [2, 3, 4, 6].map(function (n) { return { value: n, label: n + " pairs" }; }), function (v) { return v === memPairs; }, function (v) { memPairs = v; if (view === "memory") renderMem(); });
     group("opt-mitems", [["animals", "Animals"], ["pictures", "Pictures"], ["colors", "Colors"], ["shapes", "Shapes"]].map(function (o) { return { value: o[0], label: o[1] }; }),
       function (v) { return v === memItems; }, function (v) { memItems = v; if (view === "memory") renderMem(); });
@@ -1833,7 +1852,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
 
   /* ================= Remember settings on this device ================= */
   function saveSettings() {
-    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, muted: muted, homeBy: homeBy, memPairs: memPairs, memItems: memItems, patSize: patSize, patItems: patItems, patCount: patCount, patHide: patHide })); } catch (e) {}
+    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, muted: muted, listen: listen, homeBy: homeBy, memPairs: memPairs, memItems: memItems, patSize: patSize, patItems: patItems, patCount: patCount, patHide: patHide })); } catch (e) {}
   }
   function loadSettings() {
     try {
@@ -1845,6 +1864,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       if ([0, 2, 3, 4].indexOf(o.wordLen) >= 0) wordLen = o.wordLen;
       if (typeof o.pics === "boolean") pics = o.pics;
       if (typeof o.muted === "boolean") muted = o.muted;
+      if (typeof o.listen === "boolean") listen = o.listen;
       if (o.homeBy === "topic" || o.homeBy === "type") homeBy = o.homeBy;
       if ([2, 3, 4, 6].indexOf(o.memPairs) >= 0) memPairs = o.memPairs;
       if (["animals", "pictures", "colors", "shapes"].indexOf(o.memItems) >= 0) memItems = o.memItems;
