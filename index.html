@@ -130,7 +130,6 @@ body[data-view="match"] #match { display: flex; }
 body[data-view="learn"] .match-only { display: none !important; }
 body[data-view="match"] .learn-only { display: none !important; }
 body:not([data-game="words"]) .words-only { display: none !important; }
-body:is([data-game="counting"],[data-game="opposites"],[data-game="rhymes"],[data-game="firstsounds"],[data-game="sort"],[data-game="bigsmall"],[data-game="odd"],[data-game="next"],[data-game="abstract"]) .listen-row { display: none !important; }
 #target.listen svg { color: rgba(255,255,255,.9); }
 body[data-text="0"] .text-only { display: none !important; }
 
@@ -342,7 +341,6 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     <div class="setrow match-only"><h3>How many to practice</h3><div class="opts" id="opt-pool"></div>
       <p class="hint">Start small. The game uses the first ones in the list, which are the easiest.</p></div>
     <div class="setrow match-only"><h3>Answer blocks</h3><div class="opts" id="opt-count"></div></div>
-    <div class="setrow match-only listen-row"><h3>How to play</h3><div class="opts" id="opt-listen"></div></div>
     <div class="setrow text-only"><h3>Letter style</h3><div class="opts" id="opt-case"></div>
       <p class="hint">Aa shows the big capital, and he finds the little one (or in Learn, shows both).</p></div>
     <div class="setrow vo-memory"><h3>How many pairs</h3><div class="opts" id="opt-mpairs"></div></div>
@@ -1107,8 +1105,6 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       function (v) { return v === Math.min(poolIdx, GAMES[game].labels.length - 1); }, function (v) { poolIdx = v; lastId = null; newRound(); });
     group("opt-count", [2, 3, 4, 5, 6].map(function (n) { return { value: n, label: String(n) }; }),
       function (v) { return v === optCount; }, function (v) { optCount = v; newRound(); });
-    group("opt-listen", [{ value: false, label: "Look and match" }, { value: true, label: "Listen and pick" }],
-      function (v) { return v === listen; }, function (v) { listen = v; lastId = null; newRound(); });
     group("opt-mpairs", [2, 3, 4, 6].map(function (n) { return { value: n, label: n + " pairs" }; }), function (v) { return v === memPairs; }, function (v) { memPairs = v; if (view === "memory") renderMem(); });
     group("opt-mitems", [["animals", "Animals"], ["pictures", "Pictures"], ["colors", "Colors"], ["shapes", "Shapes"]].map(function (o) { return { value: o[0], label: o[1] }; }),
       function (v) { return v === memItems; }, function (v) { memItems = v; if (view === "memory") renderMem(); });
@@ -1784,20 +1780,28 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     ["words",    "Match words",    '<span class="hi sm">cat</span>'],
     ["pictures", "Match pictures", '<span class="hi emo">🍎</span>'],
     ["animals",  "Match animals",  '<span class="hi emo">🐶</span>'],
+    ["listen-letters", "Listen: letters", '<span class="hi sm">👂A</span>'],
+    ["listen-numbers", "Listen: numbers", '<span class="hi sm">👂5</span>'],
+    ["listen-colors", "Listen: colors", '<span class="hi emo two">👂🎨</span>'],
+    ["listen-shapes", "Listen: shapes", '<span class="hi emo two">👂🔺</span>'],
+    ["listen-words", "Listen: words", '<span class="hi sm">👂cat</span>'],
+    ["listen-pictures", "Listen: pictures", '<span class="hi emo two">👂🍎</span>'],
+    ["listen-animals", "Listen: animals", '<span class="hi emo two">👂🐶</span>'],
     ["abstract", "Match patterns", svgIcon(ABSTRACT_ITEMS[0])]
   ];
   // Two ways to arrange the home screen: by what they teach (topic) or by how you play (game type).
   var HOME_LAYOUTS = {
     topic: [
-      ["Letters", ["learn", "letters", "trace-letters", "firstsounds"]],
-      ["Numbers", ["learn-numbers", "numbers", "trace-numbers", "counting", "dots"]],
-      ["Colors and shapes", ["colors", "shapes", "trace-shapes"]],
-      ["Pictures and words", ["nursery", "words", "pictures", "animals", "abstract", "opposites", "rhymes", "sort"]],
+      ["Letters", ["learn", "letters", "listen-letters", "trace-letters", "firstsounds"]],
+      ["Numbers", ["learn-numbers", "numbers", "listen-numbers", "trace-numbers", "counting", "dots"]],
+      ["Colors and shapes", ["colors", "listen-colors", "shapes", "listen-shapes", "trace-shapes"]],
+      ["Pictures and words", ["nursery", "words", "listen-words", "pictures", "listen-pictures", "animals", "listen-animals", "abstract", "opposites", "rhymes", "sort"]],
       ["Thinking games", ["path", "bigsmall", "odd", "next", "memory", "pattern"]]
     ],
     type: [
       ["Learn", ["learn", "learn-numbers", "nursery"]],
       ["Match", ["letters", "numbers", "colors", "shapes", "words", "pictures", "animals", "abstract", "opposites", "rhymes", "firstsounds", "sort"]],
+      ["Listen and pick", ["listen-letters", "listen-numbers", "listen-colors", "listen-shapes", "listen-words", "listen-pictures", "listen-animals"]],
       ["Trace", ["trace-letters", "trace-numbers", "trace-shapes", "path", "dots"]],
       ["Think and count", ["counting", "bigsmall", "odd", "next", "memory", "pattern"]]
     ]
@@ -1838,6 +1842,8 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     if (id.indexOf("trace-") === 0) { tset = id.slice(6); tpos = 0; setView("trace"); return; }
     if (id === "memory" || id === "pattern" || id === "path" || id === "dots") { setView(id); return; }
     if (id === "nursery") { setView("rhyme"); return; }
+    listen = id.indexOf("listen-") === 0;
+    if (listen) id = id.slice(7);
     game = id; lastId = null;
     if (id === "words" && mode === "upper") mode = "lower";
     setView("match");
@@ -1852,7 +1858,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
 
   /* ================= Remember settings on this device ================= */
   function saveSettings() {
-    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, muted: muted, listen: listen, homeBy: homeBy, memPairs: memPairs, memItems: memItems, patSize: patSize, patItems: patItems, patCount: patCount, patHide: patHide })); } catch (e) {}
+    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, muted: muted, homeBy: homeBy, memPairs: memPairs, memItems: memItems, patSize: patSize, patItems: patItems, patCount: patCount, patHide: patHide })); } catch (e) {}
   }
   function loadSettings() {
     try {
@@ -1864,7 +1870,6 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       if ([0, 2, 3, 4].indexOf(o.wordLen) >= 0) wordLen = o.wordLen;
       if (typeof o.pics === "boolean") pics = o.pics;
       if (typeof o.muted === "boolean") muted = o.muted;
-      if (typeof o.listen === "boolean") listen = o.listen;
       if (o.homeBy === "topic" || o.homeBy === "type") homeBy = o.homeBy;
       if ([2, 3, 4, 6].indexOf(o.memPairs) >= 0) memPairs = o.memPairs;
       if (["animals", "pictures", "colors", "shapes"].indexOf(o.memItems) >= 0) memItems = o.memItems;
