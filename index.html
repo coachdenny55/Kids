@@ -80,6 +80,7 @@ svg .wk { fill: none; stroke: #fff; opacity: .75; stroke-width: 4; stroke-lineca
 #match { position: relative; flex: 1 1 auto; min-height: 0; display: none; flex-direction: column; gap: 26px; padding: 10px 10px 14px; }
 #target { flex: 1 1 auto; min-height: 0; border-radius: 28px; font-size: var(--tfs, min(62vw, 36vh)); }
 #target.svgi svg { width: 56%; height: 56%; }
+body[data-game="bigsmall"] .choice.svgi svg { width: 92%; height: 92%; }
 #choices { flex: 0 0 26%; min-height: 0; display: flex; justify-content: center; gap: 14px; }
 .choice { position: relative; flex: 1 1 0; min-width: 0; max-width: 260px; border-radius: 22px; background: #dcd9d3; color: #3a3733; font-size: var(--cfs, min(22vw, 14vh)); }
 .choice.gone { opacity: .12; pointer-events: none; }
@@ -839,7 +840,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   var ROUNDS = {
     big: function () {
       var k = Math.max(2, Math.min(optCount, 4));
-      var scales = k === 2 ? [0.38, 1] : k === 3 ? [0.3, 0.62, 1] : [0.28, 0.48, 0.72, 1];
+      var scales = k === 2 ? [0.2, 1] : k === 3 ? [0.18, 0.5, 1] : [0.15, 0.34, 0.6, 1];
       var which = poolIdx === 0 ? "big" : poolIdx === 1 ? "small" : (Math.random() < 0.5 ? "big" : "small");
       var base = SHAPE_ITEMS.filter(function (x) { return ["circle", "square", "star", "heart", "triangle"].indexOf(x.id) >= 0; });
       base = pick(base.length ? base : SHAPE_ITEMS);
