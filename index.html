@@ -30,7 +30,8 @@
   --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   color-scheme: light;
 }
-* { box-sizing: border-box; touch-action: pan-y; -webkit-touch-callout: none; }
+* { box-sizing: border-box; touch-action: pan-y; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+input, textarea { -webkit-user-select: text; user-select: text; }
 html, body { height: 100%; margin: 0; background: var(--strip); }
 body { display: flex; flex-direction: column; font-family: var(--font-ui); color: var(--strip-ink); -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
 
@@ -1027,6 +1028,8 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   function rearm() { if (document.visibilityState === "hidden") return; dingReady = false; speechOK = false; }
   document.addEventListener("visibilitychange", rearm);
   window.addEventListener("pageshow", rearm);
+  // No text selection, lookup or copy menus anywhere.
+  ["selectstart", "contextmenu", "dragstart"].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }); });
   function chime(soft) {
     if (muted) releaseCheck(); else setTimeout(releaseCheck, 90);  // audio takes a moment to start, so the check follows it
     if (muted) return;
