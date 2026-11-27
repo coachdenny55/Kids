@@ -1889,18 +1889,16 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
 
   /* ================= Remember settings on this device ================= */
   function saveSettings() {
-    try { localStorage.setItem("little-letters", JSON.stringify({ speak: speak, mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, muted: muted, homeBy: homeBy, memPairs: memPairs, memItems: memItems, patSize: patSize, patItems: patItems, patCount: patCount, patHide: patHide })); } catch (e) {}
+    try { localStorage.setItem("little-letters", JSON.stringify({ mode: mode, optCount: optCount, poolIdx: poolIdx, wordLen: wordLen, pics: pics, homeBy: homeBy, memPairs: memPairs, memItems: memItems, patSize: patSize, patItems: patItems, patCount: patCount, patHide: patHide })); } catch (e) {}
   }
   function loadSettings() {
     try {
       var o = JSON.parse(localStorage.getItem("little-letters") || "{}");
-      if (typeof o.speak === "boolean") speak = o.speak;
       if (["upper", "lower", "both"].indexOf(o.mode) >= 0) mode = o.mode;
       if ([2, 3, 4, 5, 6].indexOf(o.optCount) >= 0) optCount = o.optCount;
       if ([0, 1, 2, 3].indexOf(o.poolIdx) >= 0) poolIdx = o.poolIdx;
       if ([0, 2, 3, 4].indexOf(o.wordLen) >= 0) wordLen = o.wordLen;
       if (typeof o.pics === "boolean") pics = o.pics;
-      if (typeof o.muted === "boolean") muted = o.muted;
       if (o.homeBy === "topic" || o.homeBy === "type") homeBy = o.homeBy;
       if ([2, 3, 4, 6].indexOf(o.memPairs) >= 0) memPairs = o.memPairs;
       if (["animals", "pictures", "colors", "shapes"].indexOf(o.memItems) >= 0) memItems = o.memItems;
