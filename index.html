@@ -131,6 +131,8 @@ body[data-view="learn"] .match-only { display: none !important; }
 body[data-view="match"] .learn-only { display: none !important; }
 body:not([data-game="words"]) .words-only { display: none !important; }
 #target.listen svg { color: rgba(255,255,255,.9); }
+#target.listen.neutral { background: #e6e3dc; box-shadow: none; }
+#target.listen.neutral svg { color: #8d897f; }
 body[data-text="0"] .text-only { display: none !important; }
 
 #strip {
@@ -631,18 +633,35 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
     }).catch(function () { storeOK = false; }).then(function () { renderVoiceRows(); });
   }
   var voiceTok = 0;
+  var ttsBusy = 0, speechOK = false;
   function stopSounds() {
     voiceTok++;
     if (playing) { try { playing.pause(); } catch (e) {} playing = null; }
-    try { window.speechSynthesis.cancel(); } catch (e) {}
+    // Only cancel speech we started. Cancelling a quiet wake-up would undo it.
+    if (ttsBusy) { ttsBusy = 0; try { window.speechSynthesis.cancel(); } catch (e) {} }
   }
   function tts(text, done) {
     if (!text || !("speechSynthesis" in window)) { if (done) done(); return; }
     try {
-      var u = new SpeechSynthesisUtterance(text);
-      u.lang = "en-US"; u.rate = 0.8; u.pitch = 1.05; u.volume = 0.8;
-      if (done) { u.onend = done; u.onerror = done; }
-      window.speechSynthesis.speak(u);
+      var ss = window.speechSynthesis, started = false, retried = false, tok = voiceTok;
+      var go = function () {
+        var u = new SpeechSynthesisUtterance(text);
+        u.lang = "en-US"; u.rate = 0.8; u.pitch = 1.05; u.volume = 0.8;
+        u.onstart = function () { started = true; speechOK = true; };
+        u.onend = function () { started = true; if (done) done(); };
+        u.onerror = function () { started = true; if (done) done(); };
+        if (ss.paused) ss.resume();
+        ttsBusy++;
+        ss.speak(u);
+      };
+      go();
+      // iPads sometimes swallow the first sentence. If nothing started, clear the queue and say it once more.
+      setTimeout(function () {
+        if (started || retried || tok !== voiceTok) return;
+        retried = true; ttsBusy = 0;
+        try { ss.cancel(); ss.resume(); } catch (e) {}
+        setTimeout(function () { if (tok === voiceTok) go(); }, 80);
+      }, 1100);
     } catch (e) { if (done) done(); }
   }
   function vkey(g, item) { return g === "letters" ? item.id : g + ":" + item.id; }
@@ -748,9 +767,11 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   }
   function fill(el, item, role) {
     el.classList.remove("emoji", "svgi");
+    if (el.dataset.cfill) { el.style.background = ""; el.style.boxShadow = ""; delete el.dataset.cfill; }
     if (item.kind === "color") {
-      if (role === "target") { el.innerHTML = ""; el.style.background = item.color; el.style.boxShadow = item.color === "#FFFFFF" ? "inset 0 0 0 4px #d6d2c9" : ""; }
-      else { el.innerHTML = swatch(item.color); el.classList.add("svgi"); }
+      // The whole block is the color, for the big block and for every answer block.
+      el.innerHTML = ""; el.dataset.cfill = "1"; el.style.background = item.color;
+      el.style.boxShadow = item.color === "#FFFFFF" ? "inset 0 0 0 4px #d6d2c9" : "";
       return;
     }
     if (item.kind === "text") { el.textContent = caseText(item, role); }
@@ -893,7 +914,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   function newRound() {
     clearTimeout(roundTimer);
     locked = false;
-    targetEl.classList.remove("win", "listen");
+    targetEl.classList.remove("win", "listen", "neutral");
     var cfg = GAMES[game], opts, k, t;
     var ci; do { ci = Math.floor(Math.random() * BLOCKS.length); } while (ci === lastColor);
     lastColor = ci; setColor(ci);
@@ -925,6 +946,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       document.getElementById("speak-match").hidden = !t.name || game === "counting";
       if (listenOn()) {
         targetEl.classList.remove("emoji"); targetEl.classList.add("listen", "svgi");
+        targetEl.classList.toggle("neutral", game === "colors");
         targetEl.innerHTML = SPK_BIG; targetEl.style.background = ""; targetEl.style.boxShadow = "";
         targetEl.setAttribute("aria-label", "Listen, then pick. Tap to hear it again");
         var lt = t;
@@ -989,15 +1011,20 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
   // the first touch (and again after coming back) does the same thing the mute/unmute button used to.
   function wakeAudio() {
     unlockDing();
+    if (speechOK) return;
     try {
       var ss = window.speechSynthesis;
-      if (ss) { ss.cancel(); ss.resume(); var u = new SpeechSynthesisUtterance(" "); u.volume = 0; ss.speak(u); }
+      if (ss) {
+        if (ss.paused) ss.resume();
+        var u = new SpeechSynthesisUtterance(".");
+        u.volume = 0.01; u.onstart = function () { speechOK = true; };
+        ss.speak(u);
+      }
     } catch (x) {}
   }
-  var woke = false;
-  function firstWake() { if (woke) return; woke = true; wakeAudio(); }
-  ["touchend", "pointerup", "click"].forEach(function (ev) { document.addEventListener(ev, firstWake, { capture: true, passive: true }); });
-  function rearm() { if (document.visibilityState === "hidden") return; dingReady = false; woke = false; }
+  // Keep trying on every touch until the voice and the chime both report they are awake.
+  ["touchend", "pointerup", "click"].forEach(function (ev) { document.addEventListener(ev, wakeAudio, { capture: true, passive: true }); });
+  function rearm() { if (document.visibilityState === "hidden") return; dingReady = false; speechOK = false; }
   document.addEventListener("visibilitychange", rearm);
   window.addEventListener("pageshow", rearm);
   function chime(soft) {
@@ -1052,6 +1079,7 @@ body:not([data-view="rhyme"]) .rhyme-only { display: none !important; }
       locked = true;
       Array.prototype.forEach.call(choicesEl.children, function (c) { if (c !== btn) c.classList.add("gone"); });
       btn.classList.add("picked");
+      if (btn.dataset.cfill) { btn.style.background = ""; btn.style.boxShadow = ""; }
       if (targetEl.classList.contains("listen")) { targetEl.classList.remove("listen"); fill(targetEl, target, "target"); }
       targetEl.classList.add("win");
       celebrate(btn, true);
